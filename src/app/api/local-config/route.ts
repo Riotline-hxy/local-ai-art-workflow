@@ -1,3 +1,4 @@
+import { isTextEffort } from '@/lib/text-options';
 import { NextRequest, NextResponse } from 'next/server';
 import { getRuntimeConfig, saveRuntimeConfig } from '@/lib/runtime-config';
 const headers = { 'Cache-Control': 'no-store' };
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
     try {
         const c = await getRuntimeConfig();
         return NextResponse.json({ openaiBaseUrl: c.openaiBaseUrl, promptRefinerBaseUrl: c.promptRefinerBaseUrl,
-            promptRefinerModel: c.promptRefinerModel, promptRefinerEnabled: !!c.promptRefinerEnabled,
+            promptRefinerModel: c.promptRefinerModel, promptRefinerEnabled: !!c.promptRefinerEnabled, promptRefinerEffort: c.promptRefinerEffort || 'default', canEditCredentials: true, canEditPreferences: true,
             imageKeyConfigured: !!c.openaiApiKey, textKeyConfigured: !!c.promptRefinerApiKey }, { headers });
     } catch { return NextResponse.json({ error: 'Unable to read local configuration.' }, { status: 500, headers }); }
 }
@@ -43,6 +44,10 @@ export async function POST(request: NextRequest) {
         if (body.promptRefinerEnabled !== undefined) {
             if (typeof body.promptRefinerEnabled !== 'boolean') throw new Error();
             config.promptRefinerEnabled = body.promptRefinerEnabled;
+        }
+        if (body.promptRefinerEffort !== undefined) {
+            if (!isTextEffort(body.promptRefinerEffort)) throw new Error();
+            config.promptRefinerEffort = body.promptRefinerEffort;
         }
         await saveRuntimeConfig(config);
         return NextResponse.json({ ok: true }, { headers });

@@ -13,7 +13,7 @@ const initialCwd = process.cwd();
 const environmentNames = [
     'NODE_ENV', 'OPENAI_API_KEY', 'OPENAI_API_BASE_URL', 'PROMPT_REFINER_API_KEY',
     'PROMPT_REFINER_BASE_URL', 'PROMPT_REFINER_MODEL', 'PROMPT_REFINER_ENABLED',
-    'NEXT_PUBLIC_PROMPT_REFINER_ENABLED'
+    'NEXT_PUBLIC_PROMPT_REFINER_ENABLED', 'PROMPT_REFINER_EFFORT'
 ];
 const initialEnvironment = Object.fromEntries(environmentNames.map(name => [name, process.env[name]]));
 let temporaryRoot;
@@ -32,11 +32,13 @@ async function transpile(relativePath, targetName, rewrite = source => source) {
 before(async () => {
     temporaryRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'photo-model-config-test-'));
     await transpile('src/lib/model-catalog.ts', 'model-catalog.mjs');
-    await transpile('src/lib/runtime-config.ts', 'runtime-config.mjs');
+    await transpile('src/lib/text-options.ts', 'text-options.mjs');
+    await transpile('src/lib/runtime-config.ts', 'runtime-config.mjs', source => source.replaceAll("'@/lib/text-options'", "'./text-options.mjs'"));
     await transpile('src/app/api/local-config/route.ts', 'local-config-route.mjs',
         source => source
             .replaceAll("'next/server'", "'./next-server-stub.mjs'")
-            .replaceAll("'@/lib/runtime-config'", "'./runtime-config.mjs'"));
+            .replaceAll("'@/lib/runtime-config'", "'./runtime-config.mjs'")
+            .replaceAll("'@/lib/text-options'", "'./text-options.mjs'"));
     await fs.writeFile(path.join(temporaryRoot, 'next-server-stub.mjs'),
         'export class NextResponse extends Response { static json(body, options = {}) { return Response.json(body, options); } }');
     for (const name of environmentNames) delete process.env[name];
@@ -123,7 +125,7 @@ test('configuration persistence, redaction, and local route guards', { concurren
             openaiApiKey: '  test-image-saved-secret  ',
             promptRefinerBaseUrl: 'https://text.example.test/v1/',
             promptRefinerApiKey: 'test-text-saved-secret',
-            promptRefinerModel: 'custom-chat',
+            promptRefinerModel: 'custom-chat', promptRefinerEffort: 'high',
             promptRefinerEnabled: true
         }));
         assert.equal(response.status, 200);
@@ -140,6 +142,9 @@ test('configuration persistence, redaction, and local route guards', { concurren
         assert.equal(publicSettings.imageKeyConfigured, true);
         assert.equal(publicSettings.textKeyConfigured, true);
         assert.equal(publicSettings.promptRefinerModel, 'custom-chat');
+        assert.equal(publicSettings.promptRefinerEffort, 'high');
+        assert.equal(publicSettings.canEditPreferences, true);
+        assert.equal(publicSettings.canEditCredentials, true);
         assert.equal('openaiApiKey' in publicSettings, false);
         assert.equal('promptRefinerApiKey' in publicSettings, false);
         assert.equal(JSON.stringify(publicSettings).includes('secret'), false);

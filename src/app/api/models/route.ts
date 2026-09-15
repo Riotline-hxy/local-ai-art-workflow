@@ -19,6 +19,6 @@ export async function GET(request: NextRequest) {
     try {
         const c = await getRuntimeConfig();
         const [image, text] = await Promise.all([list('image', c.openaiBaseUrl, c.openaiApiKey), list('text', c.promptRefinerBaseUrl, c.promptRefinerApiKey)]);
-        return NextResponse.json({ imageModels: image.models, textModels: text.models, errors: { image: image.error, text: text.error }, refinerEnabled: !!c.promptRefinerEnabled, textModel: c.promptRefinerModel || '' }, { headers: { 'Cache-Control': 'no-store' } });
+        return NextResponse.json({ imageModels: image.models, textModels: text.models, errors: { image: image.error, text: text.error }, refinerEnabled: !!c.promptRefinerEnabled, textModel: c.promptRefinerModel || '', textEffort: c.promptRefinerEffort || 'default' }, { headers: { 'Cache-Control': 'no-store' } });
     } catch { return NextResponse.json({ error: 'Unable to read local configuration' }, { status: 500 }); }
 }

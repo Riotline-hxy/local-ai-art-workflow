@@ -1,4 +1,5 @@
 'use client';
+import { EFFORT_OPTIONS, isTextEffort, type TextEffort } from '@/lib/text-options';
 
 import * as React from 'react';
 import {
@@ -34,17 +35,20 @@ interface ConfigForm {
     promptRefinerApiKey: string;
     promptRefinerModel: string;
     promptRefinerEnabled: boolean;
+    promptRefinerEffort: TextEffort;
 }
 
 type SettingsResponse = Partial<Omit<ConfigForm, 'openaiApiKey' | 'promptRefinerApiKey'>> & {
     imageKeyConfigured?: boolean;
     textKeyConfigured?: boolean;
     error?: string;
+    canEditCredentials?: boolean;
+    canEditPreferences?: boolean;
 };
 
 const emptyForm: ConfigForm = {
     openaiBaseUrl: '', openaiApiKey: '', promptRefinerBaseUrl: '',
-    promptRefinerApiKey: '', promptRefinerModel: '', promptRefinerEnabled: false
+    promptRefinerApiKey: '', promptRefinerModel: '', promptRefinerEnabled: false, promptRefinerEffort: 'default'
 };
 const fieldClass = 'h-11 rounded-xl border-white/10 bg-slate-950/70 text-slate-100 shadow-none placeholder:text-slate-600 focus-visible:border-cyan-400/60 focus-visible:ring-cyan-400/15';
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
@@ -60,6 +64,8 @@ export function SettingsDialog({
     const [keyStatus, setKeyStatus] = React.useState({ image: false, text: false });
     const [loading, setLoading] = React.useState(true);
     const [saving, setSaving] = React.useState(false);
+    const [canEditCredentials, setCanEditCredentials] = React.useState(false);
+    const [canEditPreferences, setCanEditPreferences] = React.useState(false);
     const [unavailable, setUnavailable] = React.useState(false);
     const [message, setMessage] = React.useState<'saved' | 'load-error' | 'save-error' | null>(null);
     const [serverError, setServerError] = React.useState<string | null>(null);
@@ -70,7 +76,8 @@ export function SettingsDialog({
     const visibleModels = currentModels.filter(model => model.toLowerCase().includes(modelSearch.toLowerCase()));
     const currentError = modelErrors[activeTab];
     const textModelSupported = textList.includes(form.promptRefinerModel);
-    const controlsDisabled = loading || saving || unavailable || busy;
+    const controlsDisabled = loading || saving || unavailable || busy || !canEditPreferences;
+    const credentialControlsDisabled = controlsDisabled || !canEditCredentials;
 
     React.useEffect(() => {
         if (!open) return;
@@ -89,13 +96,16 @@ export function SettingsDialog({
                     if (response.status === 403) setUnavailable(true);
                     throw new Error(data.error || 'Unable to load settings');
                 }
+                setCanEditCredentials(data.canEditCredentials !== false);
+                setCanEditPreferences(data.canEditPreferences !== false);
                 setForm({
                     openaiBaseUrl: data.openaiBaseUrl || '',
                     openaiApiKey: '',
                     promptRefinerBaseUrl: data.promptRefinerBaseUrl || '',
                     promptRefinerApiKey: '',
                     promptRefinerModel: data.promptRefinerModel || '',
-                    promptRefinerEnabled: Boolean(data.promptRefinerEnabled)
+                    promptRefinerEnabled: Boolean(data.promptRefinerEnabled),
+                    promptRefinerEffort: isTextEffort(data.promptRefinerEffort) ? data.promptRefinerEffort : 'default'
                 });
                 setKeyStatus({
                     image: Boolean(data.imageKeyConfigured), text: Boolean(data.textKeyConfigured)
@@ -129,7 +139,7 @@ export function SettingsDialog({
             const response = await fetch(basePath + '/api/local-config', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(form)
+                body: JSON.stringify(canEditCredentials ? form : { promptRefinerModel: form.promptRefinerModel, promptRefinerEnabled: form.promptRefinerEnabled, promptRefinerEffort: form.promptRefinerEffort })
             });
             const data = await response.json() as SettingsResponse;
             if (!response.ok) throw new Error(data.error || 'Unable to save settings');
@@ -167,11 +177,10 @@ export function SettingsDialog({
                         {copy('创作空间设置', 'WORKSPACE SETTINGS')}
                     </div>
                     <DialogTitle className='text-xl font-semibold tracking-tight sm:text-2xl'>
-                        {copy('连接你的模型', 'Connect your models')}
+                        {canEditCredentials ? copy('连接你的模型', 'Connect your models') : copy('模型与创作设置', 'Model preferences')}
                     </DialogTitle>
                     <DialogDescription className='pr-5 text-sm leading-6 text-slate-400'>
-                        {copy('图片模型负责创作，文本模型负责整理提示词。两组 API 可以独立配置。',
-                            'Image models create your visuals. Text models refine your prompts. Configure each API independently.')}
+                        {canEditCredentials ? copy('图片模型负责创作，文本模型负责整理提示词。两组 API 可以独立配置。', 'Image models create your visuals. Text models refine your prompts. Configure each API independently.') : copy('API 已配置好，直接选择模型和强度即可使用。', 'Your API is ready. Choose a model and effort to get started.')}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -284,6 +293,7 @@ export function SettingsDialog({
                                 </div>
                             ) : (
                                 <div className='space-y-4'>
+                                    {canEditCredentials && <>
                                     <div className='space-y-2'>
                                         <label htmlFor={'settings-' + activeTab + '-url'} className='block text-xs font-medium text-slate-300'>
                                             {copy('接口地址', 'Base URL')}{language === 'zh' && <span className='font-normal text-slate-500'> / Base URL</span>}
@@ -296,7 +306,7 @@ export function SettingsDialog({
                                             placeholder='https://api.example.com/v1'
                                             value={providerIsImage ? form.openaiBaseUrl : form.promptRefinerBaseUrl}
                                             onChange={event => updateField(providerIsImage ? 'openaiBaseUrl' : 'promptRefinerBaseUrl', event.target.value)}
-                                            disabled={controlsDisabled}
+                                            disabled={credentialControlsDisabled}
                                             className={fieldClass}
                                         />
                                     </div>
@@ -312,10 +322,12 @@ export function SettingsDialog({
                                             placeholder={keyConfigured ? copy('已保存，留空保持原密钥', 'Saved — leave blank to keep the current key') : copy('输入 API 密钥', 'Enter your API key')}
                                             value={providerIsImage ? form.openaiApiKey : form.promptRefinerApiKey}
                                             onChange={event => updateField(providerIsImage ? 'openaiApiKey' : 'promptRefinerApiKey', event.target.value)}
-                                            disabled={controlsDisabled}
+                                            disabled={credentialControlsDisabled}
                                             className={fieldClass}
                                         />
                                     </div>
+                                    </>}
+                                    {!canEditCredentials && <p className='text-xs leading-5 text-slate-400'>{copy('API 由管理员提供。你可以修改文本模型、推理强度和提示词整理开关。', 'The administrator provides the API. You can change the text model, effort, and prompt refinement switch.')}</p>}
                                     {!providerIsImage && (
                                         <div className='space-y-2'>
                                             <label htmlFor='settings-text-model' className='block text-xs font-medium text-slate-300'>{copy('用于整理提示词的文本模型', 'Text model for prompt refinement')}</label>
@@ -331,12 +343,20 @@ export function SettingsDialog({
                                                     {textList.map(model => <SelectItem key={model} value={model} className='focus:bg-cyan-300/10 focus:text-cyan-100'>{model}</SelectItem>)}
                                                 </SelectContent>
                                             </Select>
+                                            <label htmlFor='settings-text-effort' className='mt-4 block text-xs font-medium text-slate-300'>{copy('推理强度 / Effort', 'Reasoning effort')}</label>
+                                            <Select value={form.promptRefinerEffort} onValueChange={value => { if (isTextEffort(value)) updateField('promptRefinerEffort', value); }} disabled={controlsDisabled}>
+                                                <SelectTrigger id='settings-text-effort' className={fieldClass + ' w-full'}><SelectValue /></SelectTrigger>
+                                                <SelectContent className='border-white/10 bg-slate-950 text-white'>
+                                                    {EFFORT_OPTIONS.map(value => <SelectItem key={value} value={value}>{value === 'default' ? copy('服务商默认', 'Provider default') : value}</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
+                                            <p className='text-xs leading-5 text-slate-500'>{copy('用于提示词整理。默认不发送 effort 参数；可用强度取决于模型和服务商。', 'Used for prompt refinement. Default omits the effort parameter; supported levels depend on the model and provider.')}</p>
                                             {form.promptRefinerModel && !textModelSupported && (
                                                 <p className='break-words text-xs leading-5 text-amber-300/90'>
                                                     {copy('已保存的模型不在当前列表中：', 'The saved model is not in the current list: ')}{form.promptRefinerModel}
                                                 </p>
                                             )}
-                                            <p className='text-xs leading-5 text-slate-500'>{copy('首次配置时，先保存 API，再从刷新的模型列表中选择并保存。', 'For a new provider, save the API first, then select a model from the refreshed list and save again.')}</p>
+                                            <p className='text-xs leading-5 text-slate-500'>{canEditCredentials ? copy('首次配置时，先保存 API，再从刷新的模型列表中选择并保存。', 'For a new provider, save the API first, then select a model from the refreshed list and save again.') : copy('保存后用于接下来的图片任务；聊天窗口有独立的模型和强度选择。', 'Saved preferences apply to subsequent image tasks; chat has its own model and effort selection.')}</p>
                                         </div>
                                     )}
                                 </div>
@@ -396,7 +416,7 @@ export function SettingsDialog({
                             <div role={message === 'saved' ? 'status' : 'alert'} className={'flex items-start gap-2 text-xs leading-5 ' + (message === 'saved' ? 'text-emerald-300' : 'text-rose-300')}>
                                 {message === 'saved' ? <Check className='mt-0.5 size-4 shrink-0' /> : <CircleAlert className='mt-0.5 size-4 shrink-0' />}
                                 <span className='min-w-0 break-words'>
-                                    {message === 'saved' ? copy('配置已保存到本地，下次请求立即生效。重启后仍然保留。', 'Saved locally and applied to the next request. Your settings survive restarts.')
+                                    {message === 'saved' ? copy('设置已保存，下次请求立即生效。重启后仍然保留。', 'Saved and applied to the next request. Your settings survive restarts.')
                                         : message === 'load-error' ? copy('无法读取配置。', 'Could not load settings.') : copy('保存未完成。', 'Could not save settings.')}
                                     {serverError && ' ' + t(serverError)}
                                 </span>

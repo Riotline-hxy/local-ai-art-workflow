@@ -1,1 +1,47 @@
-import {NextRequest,NextResponse} from 'next/server';import OpenAI from 'openai';import {getRuntimeConfig} from '@/lib/runtime-config';import {accessDenied} from '@/lib/private-access';export async function POST(r:NextRequest){const d=accessDenied(r);if(d)return d;try{const c=await getRuntimeConfig();if(!c.promptRefinerApiKey||!c.promptRefinerModel)return NextResponse.json({error:'请先在设置中配置文本 API Key 和文本模型。'},{status:503});const b=await r.json();const messages=Array.isArray(b.messages)?b.messages.filter((m:any)=>m&&['user','assistant','system'].includes(m.role)&&typeof m.content==='string').slice(-30):[];if(!messages.some((m:any)=>m.role==='user'&&m.content.trim()))return NextResponse.json({error:'消息不能为空。'},{status:400});const x=await new OpenAI({apiKey:c.promptRefinerApiKey,baseURL:c.promptRefinerBaseUrl,maxRetries:0,timeout:180000}).chat.completions.create({model:c.promptRefinerModel,messages,temperature:.7});return NextResponse.json({message:x.choices[0]?.message?.content||'',model:c.promptRefinerModel});}catch(e){return NextResponse.json({error:e instanceof Error?e.message:'文本模型请求失败。'},{status:502});}}
+import { NextRequest, NextResponse } from 'next/server';
+import OpenAI from 'openai';
+import { createHash } from 'node:crypto';
+import { getRuntimeConfig } from '@/lib/runtime-config';
+import { accessDenied, sameSecret } from '@/lib/private-access';
+import { effortParams, isTextEffort } from '@/lib/text-options';
+import { filterModels } from '@/lib/model-catalog';
+
+export async function POST(request: NextRequest) {
+    const denied = accessDenied(request); if (denied) return denied;
+    try {
+        const body = await request.json();
+        if (!body || typeof body !== 'object' || Array.isArray(body)) return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
+        if (process.env.APP_PASSWORD && !sameSecret(String(body.passwordHash || ''), createHash('sha256').update(process.env.APP_PASSWORD).digest('hex'))) {
+            return NextResponse.json({ error: 'Access password required.', code: 'password_required' }, { status: 401 });
+        }
+        const config = await getRuntimeConfig();
+        if (!config.promptRefinerApiKey) return NextResponse.json({ error: 'Configure the text API key in Settings.' }, { status: 503 });
+        const model = typeof body.model === 'string' ? body.model.trim() : config.promptRefinerModel;
+        const effort = body.effort ?? config.promptRefinerEffort ?? 'default';
+        if (!model || model.length > 256 || !isTextEffort(effort)) return NextResponse.json({ error: 'Select a valid text model and reasoning effort.' }, { status: 400 });
+        if (!Array.isArray(body.messages) || body.messages.length === 0 || body.messages.length > 200) return NextResponse.json({ error: 'Messages are required.' }, { status: 400 });
+        const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
+        for (const message of body.messages.slice(-30)) {
+            if (!message || !['user', 'assistant'].includes(message.role) || typeof message.content !== 'string' || message.content.length > 100000) return NextResponse.json({ error: 'Invalid message.' }, { status: 400 });
+            messages.push({ role: message.role, content: message.content });
+        }
+        if (messages.at(-1)?.role !== 'user') return NextResponse.json({ error: 'The last message must be from the user.' }, { status: 400 });
+        // Validate using the configured provider, never a browser-supplied URL or key.
+        const catalog = await fetch((config.promptRefinerBaseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '') + '/models', {
+            headers: { Authorization: 'Bearer ' + config.promptRefinerApiKey }, cache: 'no-store', signal: AbortSignal.timeout(15000)
+        });
+        if (!catalog.ok) return NextResponse.json({ error: 'Unable to verify the text model. Refresh the model list and try again.' }, { status: 503 });
+        if (!filterModels((await catalog.json()).data, 'text').includes(model)) return NextResponse.json({ error: 'This text model is not available from the configured API.' }, { status: 400 });
+        const client = new OpenAI({ apiKey: config.promptRefinerApiKey, baseURL: config.promptRefinerBaseUrl, maxRetries: 0, timeout: 180000 });
+        const result = await client.chat.completions.create({ model, messages, ...effortParams(effort) });
+        const message = result.choices[0]?.message?.content?.trim();
+        if (!message) return NextResponse.json({ error: 'The text model returned an empty reply.' }, { status: 502 });
+        return NextResponse.json({ message, model, effort }, { headers: { 'Cache-Control': 'no-store' } });
+    } catch (error) {
+        if (error instanceof OpenAI.APIError) {
+            const status = error.status && error.status >= 400 && error.status < 600 ? error.status : 502;
+            return NextResponse.json({ error: status === 400 ? 'The provider rejected these parameters. Try the default effort or another text model.' : 'Text API request failed (' + status + '). Please retry or check the provider.', code: 'provider_error' }, { status });
+        }
+        return NextResponse.json({ error: 'Chat request failed or timed out.' }, { status: 502 });
+    }
+}

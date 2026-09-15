@@ -1,3 +1,4 @@
+import { isTextEffort, type TextEffort } from '@/lib/text-options';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -9,6 +10,7 @@ export type RuntimeConfig = {
     promptRefinerBaseUrl?: string;
     promptRefinerModel?: string;
     promptRefinerEnabled?: boolean;
+    promptRefinerEffort?: TextEffort;
 };
 const configFile = path.join(process.cwd(), '.local-runtime-config.json');
 export async function getRuntimeConfig(): Promise<RuntimeConfig> {
@@ -21,6 +23,7 @@ export async function getRuntimeConfig(): Promise<RuntimeConfig> {
         promptRefinerApiKey: process.env.PROMPT_REFINER_API_KEY,
         promptRefinerBaseUrl: process.env.PROMPT_REFINER_BASE_URL || 'https://api.openai.com/v1',
         promptRefinerModel: process.env.PROMPT_REFINER_MODEL || '',
+        promptRefinerEffort: isTextEffort(process.env.PROMPT_REFINER_EFFORT) ? process.env.PROMPT_REFINER_EFFORT : 'default',
         promptRefinerEnabled: process.env.PROMPT_REFINER_ENABLED === '1' || process.env.NEXT_PUBLIC_PROMPT_REFINER_ENABLED === 'true',
         ...local
     };
