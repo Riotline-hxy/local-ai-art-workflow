@@ -1,5 +1,6 @@
 'use client';
 
+import { ElapsedTime, formatElapsed, type TimeSpan } from '@/components/elapsed-time';
 import { useLanguage } from '@/lib/i18n';
 import { EFFORT_OPTIONS, isTextEffort, type TextEffort } from '@/lib/text-options';
 import {
@@ -24,6 +25,7 @@ type Message = {
     content: string;
     model?: string;
     effort?: TextEffort;
+    durationMs?: number;
 };
 type Preferences = { model: string; effort: TextEffort };
 type ModelResponse = { textModels?: unknown[]; textModel?: string; errors?: { text?: string }; error?: string };
@@ -52,6 +54,7 @@ export default function Chat() {
     const { language, setLanguage, t } = useLanguage();
     const [messages, setMessages] = React.useState<Message[]>([]);
     const [input, setInput] = React.useState('');
+    const [requestTime, setRequestTime] = React.useState<TimeSpan | null>(null);
     const [busy, setBusy] = React.useState(false);
     const [error, setError] = React.useState('');
     const [models, setModels] = React.useState<string[]>([]);
@@ -141,6 +144,8 @@ export default function Chat() {
         const content = input.trim();
         if (!canSend || requestInFlight.current) return;
         requestInFlight.current = true;
+        const started = performance.now();
+        setRequestTime({ start: started });
         const requestModel = model;
         const requestEffort = effort;
         const nextMessages: Message[] = [...messages, { role: 'user', content }];
@@ -166,11 +171,12 @@ export default function Chat() {
             }
             setMessages((current) => [
                 ...current,
-                { role: 'assistant', content: data.message, model: requestModel, effort: requestEffort }
+                { role: 'assistant', content: data.message, model: requestModel, effort: requestEffort, durationMs: performance.now() - started }
             ]);
         } catch (cause) {
             setError(cause instanceof Error ? cause.message : t('请求失败。', 'Request failed.'));
         } finally {
+            setRequestTime({ start: started, end: performance.now() });
             requestInFlight.current = false;
             setBusy(false);
         }
@@ -318,6 +324,7 @@ export default function Chat() {
                                         {message.model && (
                                             <p className='mb-1 text-[11px] leading-5 break-all text-slate-500'>
                                                 {message.model} · {effortLabel(message.effort || 'default')}
+                                                {message.durationMs !== undefined && <> · {t('回复用时：', 'Response time: ')}{formatElapsed(message.durationMs)}</>}
                                             </p>
                                         )}
                                         <div className='[overflow-wrap:anywhere] whitespace-pre-wrap'>
@@ -332,6 +339,7 @@ export default function Chat() {
                                 <Loader2 size={16} className='shrink-0 animate-spin' />
                                 <span className='break-all'>
                                     {t('文本模型正在回复…', 'The text model is replying…')} {model}
+                                    {requestTime && <> · {t('已用时：', 'Elapsed: ')}<ElapsedTime span={requestTime} /></>}
                                 </span>
                             </div>
                         )}
@@ -340,8 +348,10 @@ export default function Chat() {
                     {error && (
                         <p role='alert' className='mt-3 rounded-xl border border-red-400/20 p-3 text-sm text-red-200'>
                             {t(error)}
+                            {requestTime && <> · {t('失败前用时：', 'Time to failure: ')}<ElapsedTime span={requestTime} /></>}
                         </p>
                     )}
+                    <p className='mt-3 text-xs text-slate-500'>{t('回复用时从发送到完整回复返回，包含网络和服务商等待时间。', 'Response time runs from sending to receiving the full reply, including network and provider waiting.')}</p>
                     <form
                         onSubmit={(event) => {
                             event.preventDefault();
@@ -374,6 +384,7 @@ export default function Chat() {
                             type='button'
                             onClick={() => {
                                 setMessages([]);
+                                setRequestTime(null);
                                 setError('');
                             }}
                             disabled={busy || !messages.length}

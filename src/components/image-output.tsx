@@ -1,20 +1,12 @@
 'use client';
 
+import { ElapsedTime } from '@/components/elapsed-time';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { Loader2, Send, Grid } from 'lucide-react';
 import Image from 'next/image';
 import * as React from 'react';
-
-function ElapsedTimer({ startTime, className }: { startTime: number; className?: string }) {
-    const [now, setNow] = React.useState(() => Date.now());
-    React.useEffect(() => {
-        const id = setInterval(() => setNow(Date.now()), 100);
-        return () => clearInterval(id);
-    }, []);
-    return <span className={cn('tabular-nums', className)}>{Math.max(0, (now - startTime) / 1000).toFixed(1)}s</span>;
-}
 
 type ImageInfo = {
     path: string;
@@ -94,7 +86,7 @@ export function ImageOutput({
                                 <Loader2 className='h-4 w-4 animate-spin' />
                                 <p className='text-sm'>{t('正在生成预览…')}</p>
                                 {loadingStartTime !== null && (
-                                    <ElapsedTimer startTime={loadingStartTime} className='text-sm text-white/50' />
+                                    <span className='text-sm text-white/50'>{t('总用时：', 'Total: ')}<ElapsedTime span={{ start: loadingStartTime }} /></span>
                                 )}
                             </div>
                         </div>
@@ -110,18 +102,18 @@ export function ImageOutput({
                             />
                             <div className='absolute inset-0 flex flex-col items-center justify-center bg-black/50 text-white/80'>
                                 <Loader2 className='mb-2 h-8 w-8 animate-spin' />
-                                <p>{t('正在编辑图片…')}</p>
+                                <p>{t('正在处理编辑任务…', 'Processing edit task…')}</p>
                                 {loadingStartTime !== null && (
-                                    <ElapsedTimer startTime={loadingStartTime} className='mt-1 text-sm text-white/50' />
+                                    <span className='mt-1 text-sm text-white/50'>{t('总用时：', 'Total: ')}<ElapsedTime span={{ start: loadingStartTime }} /></span>
                                 )}
                             </div>
                         </div>
                     ) : (
                         <div className='flex flex-col items-center justify-center text-white/60'>
                             <Loader2 className='mb-2 h-8 w-8 animate-spin' />
-                            <p>{t('正在生成图片…')}</p>
+                            <p>{t('正在处理生图任务…', 'Processing image task…')}</p>
                             {loadingStartTime !== null && (
-                                <ElapsedTimer startTime={loadingStartTime} className='mt-1 text-sm text-white/40' />
+                                <span className='mt-1 text-sm text-white/40'>{t('总用时：', 'Total: ')}<ElapsedTime span={{ start: loadingStartTime }} /></span>
                             )}
                         </div>
                     )

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { finishTiming, type WorkflowTiming } from '@/components/elapsed-time';
 import { SettingsDialog } from '@/components/settings-dialog';
 import { WorkflowPanel } from '@/components/workflow-panel';
 import { useI18n } from '@/lib/i18n';
@@ -26,6 +27,8 @@ export type HistoryMetadata = {
     images: HistoryImage[];
     storageModeUsed?: 'fs' | 'indexeddb';
     durationMs: number;
+    refinementMs?: number;
+    imageRequestMs?: number;
     quality: GenerationFormData['quality'];
     background: GenerationFormData['background'];
     moderation: GenerationFormData['moderation'];
@@ -87,6 +90,7 @@ export default function HomePage() {
     const [configOpen, setConfigOpen] = React.useState(false);
     const modelsRequestRef = React.useRef<AbortController | null>(null);
     const [promptRefinement, setPromptRefinement] = React.useState<{ original: string; refined: string; status: 'idle' | 'refining' | 'preview' | 'sending' | 'completed' | 'error' }>({ original: '', refined: '', status: 'idle' });
+    const [workflowTiming, setWorkflowTiming] = React.useState<WorkflowTiming | null>(null);
     const [generationStartTime, setGenerationStartTime] = React.useState<number | null>(null);
     const [isSendingToEdit, setIsSendingToEdit] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
@@ -405,7 +409,10 @@ export default function HomePage() {
         }
         const originalPrompt = formData.prompt;
         let refinedPrompt = originalPrompt;
-        const startTime = Date.now();
+        const startTime = performance.now();
+        let timing: WorkflowTiming = { total: { start: startTime }, ...(refinerEnabled ? { refinement: { start: startTime } } : {}) };
+        setWorkflowTiming(timing);
+        const finish = () => { timing = finishTiming(timing, performance.now()); setWorkflowTiming(timing); };
         let durationMs = 0;
         let streamCompleted = false;
         setIsLoading(true);
@@ -425,6 +432,8 @@ export default function HomePage() {
                 if (!response.ok) throw new Error(result.error || t('提示词整理失败，请检查整理器配置。', 'Prompt refinement failed. Check the refiner configuration.'));
                 if (typeof result.prompt !== 'string' || !result.prompt.trim()) throw new Error(t('文本模型未返回提示词。', 'The text model did not return a prompt.'));
                 refinedPrompt = result.prompt;
+                timing = { ...timing, refinement: { start: startTime, end: performance.now() } };
+                setWorkflowTiming(timing);
             }
             setPromptRefinement({ original: originalPrompt, refined: refinedPrompt, status: 'sending' });
             apiFormData.append('mode', mode);
@@ -474,6 +483,8 @@ export default function HomePage() {
             }
         }
 
+            timing = { ...timing, image: { start: performance.now() } };
+            setWorkflowTiming(timing);
             const response = await fetch((process.env.NEXT_PUBLIC_BASE_PATH || '') + '/api/images', {
                 method: 'POST',
                 body: apiFormData
@@ -519,7 +530,8 @@ export default function HomePage() {
                                     throw new Error(event.error || t("实时预览发生错误。", "An error occurred during live preview."));
                                 } else if (event.type === 'done') {
                                     // Finalize with all completed images
-                                    durationMs = Date.now() - startTime;
+                                    timing = { ...timing, image: { ...timing.image!, end: performance.now() } };
+                                    durationMs = performance.now() - startTime;
 
                                     if (event.images && event.images.length > 0) {
                                         let historyQuality: GenerationFormData['quality'] = 'auto';
@@ -626,7 +638,11 @@ export default function HomePage() {
                                         setImageOutputView(processedImages.length > 1 ? 'grid' : 0);
                                         setStreamingPreviewImages(new Map()); // Clear streaming previews
 
-                                        setHistory((prevHistory) => [newHistoryEntry, ...prevHistory]);
+                                        finish();
+                newHistoryEntry.durationMs = timing.total.end! - timing.total.start;
+                newHistoryEntry.refinementMs = timing.refinement ? timing.refinement.end! - timing.refinement.start : 0;
+                newHistoryEntry.imageRequestMs = timing.image!.end! - timing.image!.start;
+                setHistory((prevHistory) => [newHistoryEntry, ...prevHistory]);
                                     }
                                 }
                             } catch (parseError) {
@@ -642,6 +658,7 @@ export default function HomePage() {
 
             // Non-streaming response handling (original code)
             const result = await response.json();
+            timing = { ...timing, image: { ...timing.image!, end: performance.now() } };
 
             if (!response.ok) {
                 if (response.status === 401 && isPasswordRequiredByBackend) {
@@ -656,7 +673,7 @@ export default function HomePage() {
             }
 
             if (result.images && result.images.length > 0) {
-                durationMs = Date.now() - startTime;
+                durationMs = performance.now() - startTime;
 
                 let historyQuality: GenerationFormData['quality'] = 'auto';
                 let historyBackground: GenerationFormData['background'] = 'auto';
@@ -749,13 +766,17 @@ export default function HomePage() {
                 streamCompleted = true;
                 setImageOutputView(processedImages.length > 1 ? 'grid' : 0);
 
+                finish();
+                newHistoryEntry.durationMs = timing.total.end! - timing.total.start;
+                newHistoryEntry.refinementMs = timing.refinement ? timing.refinement.end! - timing.refinement.start : 0;
+                newHistoryEntry.imageRequestMs = timing.image!.end! - timing.image!.start;
                 setHistory((prevHistory) => [newHistoryEntry, ...prevHistory]);
             } else {
                 setLatestImageBatch(null);
                 throw new Error(t("接口未返回有效图片。", "The API did not return valid images."));
             }
         } catch (err: unknown) {
-            durationMs = Date.now() - startTime;
+            durationMs = performance.now() - startTime;
             console.error(`API Call Error after ${durationMs}ms:`, err);
             const errorMessage = err instanceof Error ? err.message : t("发生未知错误。", "An unknown error occurred.");
             setError(errorMessage);
@@ -763,7 +784,8 @@ export default function HomePage() {
             setLatestImageBatch(null);
             setStreamingPreviewImages(new Map());
         } finally {
-            if (durationMs === 0) durationMs = Date.now() - startTime;
+            finish();
+            if (durationMs === 0) durationMs = performance.now() - startTime;
             setIsLoading(false);
             setGenerationStartTime(null);
         }
@@ -1006,7 +1028,7 @@ export default function HomePage() {
                     {modelsLoading ? <span>{t('正在同步模型…', 'Syncing models…')}</span> : modelRefreshAt && <span>{t('上次同步', 'Last synced')} {new Date(modelRefreshAt).toLocaleTimeString(language === 'zh' ? 'zh-CN' : 'en-US')}</span>}
                 </div>
                 {modelErrors.image && <p role='alert' className='rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-sm text-amber-200'>{t('图片模型列表未就绪，请在设置中检查图片 API，再刷新模型。', 'Image models are unavailable. Check the image API in Settings and refresh.')}</p>}
-                <WorkflowPanel state={promptRefinement} refinerEnabled={refinerEnabled} imageModel={mode === 'generate' ? genModel : editModel} textModel={textModel} />
+                <WorkflowPanel timing={workflowTiming} state={promptRefinement} refinerEnabled={refinerEnabled} imageModel={mode === 'generate' ? genModel : editModel} textModel={textModel} />
                 <div className='grid grid-cols-1 gap-6 lg:grid-cols-2'>
                     <div className='relative flex h-[70vh] min-h-[600px] flex-col lg:col-span-1'>
                         <div className={mode === 'generate' ? 'block h-full w-full' : 'hidden'}>

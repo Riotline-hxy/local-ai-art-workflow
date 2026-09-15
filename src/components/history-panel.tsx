@@ -403,8 +403,13 @@ function HistoryPanelImpl({
                                                 `生成时间：${new Date(item.timestamp).toLocaleString()}`,
                                                 `Generated on: ${new Date(item.timestamp).toLocaleString()}`
                                             )}>
-                                            <span className='font-medium text-white/80'>{t('耗时：')}</span>{' '}
+                                            <span className='font-medium text-white/80'>{t('总用时：', 'Total: ')}</span>{' '}
                                             {formatDuration(item.durationMs)}
+                                            {item.imageRequestMs !== undefined && <span className='mt-1 block'>
+                                                {t('整理：', 'Refinement: ')}{formatDuration(item.refinementMs ?? 0)}
+                                                {' · '}{t('图片请求：', 'Image request: ')}{formatDuration(item.imageRequestMs)}
+                                            </span>}
+                                            {item.imageRequestMs === undefined && <span className='block text-white/40'>{t('旧记录未保存分阶段用时', 'Legacy record: phase timings unavailable')}</span>}
                                         </p>
                                         <p>
                                             <span className='font-medium text-white/80'>{t('模型：')}</span>{' '}

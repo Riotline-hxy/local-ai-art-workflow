@@ -1,9 +1,10 @@
 'use client';
 import { Check, Circle, Loader2, Copy, AlertCircle } from 'lucide-react';
 import * as React from 'react';
+import { ElapsedTime, type WorkflowTiming } from '@/components/elapsed-time';
 import { useI18n } from '@/lib/i18n';
 type State = { original: string; refined: string; status: 'idle' | 'refining' | 'preview' | 'sending' | 'completed' | 'error' };
-export function WorkflowPanel({ state, refinerEnabled, imageModel, textModel }: { state: State; refinerEnabled: boolean; imageModel: string; textModel: string }) {
+export function WorkflowPanel({ state, refinerEnabled, imageModel, textModel, timing }: { timing: WorkflowTiming | null; state: State; refinerEnabled: boolean; imageModel: string; textModel: string }) {
     const { t } = useI18n();
     const [copied, setCopied] = React.useState(false);
     const [copyError, setCopyError] = React.useState(false);
@@ -18,6 +19,14 @@ export function WorkflowPanel({ state, refinerEnabled, imageModel, textModel }: 
             </li>)}
         </ol>
         <p className='mt-3 text-xs text-white/45' role='status'>{state.status === 'refining' ? t('正在等待文本模型整理提示词…', 'Waiting for the text model to refine your prompt…') : state.status === 'sending' ? t('已提交图片模型，生成结果返回后会自动显示。', 'Submitted to the image model. Results will appear automatically.') : state.status === 'error' ? t('任务未完成，请查看错误信息；已整理的提示词会保留。', 'The task did not complete. See the error below; the prepared prompt is kept.') : t('本次任务已完成。', 'This task is complete.')}</p>
+        {timing && <div className='mt-4 rounded-xl bg-black/20 p-3 text-xs text-white/65'>
+            <div className='flex flex-wrap gap-x-6 gap-y-2'>
+                <span>{t('总用时：', 'Total: ')}<ElapsedTime span={timing.total} /></span>
+                <span>{t('提示词整理：', 'Prompt refinement: ')}{timing.refinement ? <ElapsedTime span={timing.refinement} /> : t('已跳过', 'Skipped')}</span>
+                <span>{t('图片请求：', 'Image request: ')}{timing.image ? <ElapsedTime span={timing.image} /> : t('未开始', 'Not started')}</span>
+            </div>
+            <p className='mt-2 leading-5 text-white/40'>{t('总用时从提交到结果处理完成，失败则到报错；包含整理、图片请求及本地处理。各请求包含网络、中转站等待和传输，不是模型纯计算时间；不含屏幕上的图片加载。', 'Total runs from submission to result processing or failure, including refinement, image request and local processing. Requests include network, provider waiting and transfer, not just model computation. Image loading on screen is excluded.')}</p>
+        </div>}
         {state.refined && <div className='mt-4 overflow-hidden rounded-xl border border-white/10 bg-black/25'>
             <div className='flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3'>
                 <div><h2 className='text-sm font-medium'>{t('最终提示词 · 实际发送内容', 'Final prompt · sent to the image model')}</h2><p className='mt-1 break-all text-xs text-white/40'>{refinerEnabled && textModel ? textModel + ' → ' : ''}{imageModel}</p></div>
