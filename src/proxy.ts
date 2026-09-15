@@ -6,7 +6,10 @@ export function proxy(request: NextRequest) {
     const invite = request.nextUrl.searchParams.get('invite');
     let response: NextResponse;
     if (request.method === 'GET' && secret && invite && sameSecret(invite, secret)) {
-        const destination = new URL(request.nextUrl.pathname || ((process.env.NEXT_PUBLIC_BASE_PATH || '') + '/'), process.env.PHOTO_PUBLIC_ORIGIN || request.url);
+        const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+        const requestPath = request.nextUrl.pathname || '/';
+        const destinationPath = requestPath === basePath || requestPath.startsWith(basePath + '/') ? requestPath : basePath + (requestPath.StartsWith('/') ? requestPath : '/' + requestPath);
+        const destination = new URL(destinationPath || '/', process.env.PHOTO_PUBLIC_ORIGIN || request.url);
         response = NextResponse.redirect(destination, 303);
         response.cookies.set(accessCookie, sessionValue(secret), {
             httpOnly: true, secure: destination.protocol === 'https:', sameSite: 'lax',
