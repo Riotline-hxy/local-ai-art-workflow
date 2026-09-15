@@ -1,9 +1,10 @@
+import { accessDenied } from '@/lib/private-access';
 import crypto from 'crypto';
 import fs from 'fs/promises';
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
 
-const outputDir = path.resolve(process.cwd(), 'generated-images');
+const outputDir = path.resolve(/* turbopackIgnore: true */ process.env.PHOTO_IMAGES_DIR || path.join(process.cwd(), 'generated-images'));
 
 function sha256(data: string): string {
     return crypto.createHash('sha256').update(data).digest('hex');
@@ -21,6 +22,9 @@ type FileDeletionResult = {
 };
 
 export async function POST(request: NextRequest) {
+    const denied = accessDenied(request);
+    if (denied) return denied;
+
     console.log('Received POST request to /api/image-delete');
 
     let requestBody: DeleteRequestBody;
@@ -68,7 +72,7 @@ export async function POST(request: NextRequest) {
             continue;
         }
 
-        const filepath = path.join(outputDir, filename);
+        const filepath = path.join(/* turbopackIgnore: true */ outputDir, filename);
 
         try {
             await fs.unlink(filepath);

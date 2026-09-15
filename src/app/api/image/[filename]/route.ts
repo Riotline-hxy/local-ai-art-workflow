@@ -1,12 +1,16 @@
+import { accessDenied } from '@/lib/private-access';
 import fs from 'fs/promises';
 import { lookup } from 'mime-types';
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
 
 // Base directory where images are stored (outside nextjs-app)
-const imageBaseDir = path.resolve(process.cwd(), 'generated-images');
+const imageBaseDir = path.resolve(/* turbopackIgnore: true */ process.env.PHOTO_IMAGES_DIR || path.join(process.cwd(), 'generated-images'));
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ filename: string }> }) {
+    const denied = accessDenied(request);
+    if (denied) return denied;
+
     const { filename } = await params;
 
     if (!filename) {
@@ -18,7 +22,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         return NextResponse.json({ error: 'Invalid filename' }, { status: 400 });
     }
 
-    const filepath = path.join(imageBaseDir, filename);
+    const filepath = path.join(/* turbopackIgnore: true */ imageBaseDir, filename);
 
     try {
         await fs.access(filepath);

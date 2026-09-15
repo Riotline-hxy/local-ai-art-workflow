@@ -1,8 +1,10 @@
+import { accessDenied } from '@/lib/private-access';
 import crypto from 'crypto';
 import fs from 'fs/promises';
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import path from 'path';
+import { getRuntimeConfig } from '@/lib/runtime-config';
 
 // Streaming event types
 type StreamingEvent = {
@@ -23,12 +25,9 @@ type StreamingEvent = {
     error?: string;
 };
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-    baseURL: process.env.OPENAI_API_BASE_URL
-});
 
-const outputDir = path.resolve(process.cwd(), 'generated-images');
+
+const outputDir = path.resolve(/* turbopackIgnore: true */ process.env.PHOTO_IMAGES_DIR || path.join(process.cwd(), 'generated-images'));
 
 // Define valid output formats for type safety
 const VALID_OUTPUT_FORMATS = ['png', 'jpeg', 'webp'] as const;
@@ -74,13 +73,13 @@ function sha256(data: string): string {
 }
 
 export async function POST(request: NextRequest) {
-    console.log('Received POST request to /api/images');
+const denied = accessDenied(request);
+    if (denied) return denied;
 
-    if (!process.env.OPENAI_API_KEY) {
-        console.error('OPENAI_API_KEY is not set.');
-        return NextResponse.json({ error: 'Server configuration error: API key not found.' }, { status: 500 });
-    }
     try {
+        const runtime = await getRuntimeConfig();
+        if (!runtime.openaiApiKey) return NextResponse.json({ error: 'Configure the image API key in Settings.' }, { status: 503 });
+        const openai = new OpenAI({ apiKey: runtime.openaiApiKey, baseURL: runtime.openaiBaseUrl });
         let effectiveStorageMode: 'fs' | 'indexeddb';
         const explicitMode = process.env.NEXT_PUBLIC_IMAGE_STORAGE_MODE;
         const isOnVercel = process.env.VERCEL === '1';
@@ -125,6 +124,8 @@ export async function POST(request: NextRequest) {
                 | 'gpt-image-1-mini'
                 | 'gpt-image-1.5'
                 | 'gpt-image-2'
+                | 'gpt-image-2.5-sunburst'
+                | 'gpt-image-2.5-flare'
                 | null) || 'gpt-image-2';
 
         console.log(`Mode: ${mode}, Model: ${model}, Prompt: ${prompt ? prompt.substring(0, 50) + '...' : 'N/A'}`);
@@ -215,7 +216,7 @@ export async function POST(request: NextRequest) {
                                     // Save to filesystem if in fs mode
                                     if (effectiveStorageMode === 'fs' && event.b64_json) {
                                         const buffer = Buffer.from(event.b64_json, 'base64');
-                                        const filepath = path.join(outputDir, filename);
+                                        const filepath = path.join(/* turbopackIgnore: true */ outputDir, filename);
                                         await fs.writeFile(filepath, buffer);
                                         console.log(`Streaming: Saved image ${filename}`);
                                     }
@@ -224,7 +225,7 @@ export async function POST(request: NextRequest) {
                                         filename,
                                         b64_json: event.b64_json || '',
                                         output_format: fileExtension,
-                                        ...(effectiveStorageMode === 'fs' ? { path: `/api/image/${filename}` } : {})
+                                        ...(effectiveStorageMode === 'fs' ? { path: `${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/image/${filename}` } : {})
                                     };
                                     completedImages.push(imageData);
 
@@ -233,7 +234,7 @@ export async function POST(request: NextRequest) {
                                         index: currentIndex,
                                         filename,
                                         b64_json: event.b64_json,
-                                        path: effectiveStorageMode === 'fs' ? `/api/image/${filename}` : undefined,
+                                        path: effectiveStorageMode === 'fs' ? `${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/image/${filename}` : undefined,
                                         output_format: fileExtension
                                     };
                                     controller.enqueue(encoder.encode(`data: ${JSON.stringify(completedEvent)}\n\n`));
@@ -359,7 +360,7 @@ export async function POST(request: NextRequest) {
                                     // Save to filesystem if in fs mode
                                     if (effectiveStorageMode === 'fs' && event.b64_json) {
                                         const buffer = Buffer.from(event.b64_json, 'base64');
-                                        const filepath = path.join(outputDir, filename);
+                                        const filepath = path.join(/* turbopackIgnore: true */ outputDir, filename);
                                         await fs.writeFile(filepath, buffer);
                                         console.log(`Streaming edit: Saved image ${filename}`);
                                     }
@@ -368,7 +369,7 @@ export async function POST(request: NextRequest) {
                                         filename,
                                         b64_json: event.b64_json || '',
                                         output_format: fileExtension,
-                                        ...(effectiveStorageMode === 'fs' ? { path: `/api/image/${filename}` } : {})
+                                        ...(effectiveStorageMode === 'fs' ? { path: `${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/image/${filename}` } : {})
                                     };
                                     completedImages.push(imageData);
 
@@ -377,7 +378,7 @@ export async function POST(request: NextRequest) {
                                         index: currentIndex,
                                         filename,
                                         b64_json: event.b64_json,
-                                        path: effectiveStorageMode === 'fs' ? `/api/image/${filename}` : undefined,
+                                        path: effectiveStorageMode === 'fs' ? `${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/image/${filename}` : undefined,
                                         output_format: fileExtension
                                     };
                                     controller.enqueue(encoder.encode(`data: ${JSON.stringify(completedEvent)}\n\n`));
@@ -455,7 +456,7 @@ export async function POST(request: NextRequest) {
                 const filename = `${timestamp}-${index}.${fileExtension}`;
 
                 if (effectiveStorageMode === 'fs') {
-                    const filepath = path.join(outputDir, filename);
+                    const filepath = path.join(/* turbopackIgnore: true */ outputDir, filename);
                     console.log(`Attempting to save image to: ${filepath}`);
                     await fs.writeFile(filepath, buffer);
                     console.log(`Successfully saved image: ${filename}`);
@@ -469,7 +470,7 @@ export async function POST(request: NextRequest) {
                 };
 
                 if (effectiveStorageMode === 'fs') {
-                    imageResult.path = `/api/image/${filename}`;
+                    imageResult.path = `${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/image/${filename}`;
                 }
 
                 return imageResult;
@@ -502,3 +503,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: errorMessage }, { status });
     }
 }
+
+
+
+

@@ -10,6 +10,7 @@ import {
     DialogTitle
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { useI18n } from '@/lib/i18n';
 import * as React from 'react';
 
 interface PasswordDialogProps {
@@ -20,13 +21,8 @@ interface PasswordDialogProps {
     description?: string;
 }
 
-export function PasswordDialog({
-    isOpen,
-    onOpenChange,
-    onSave,
-    title = 'Configure Password',
-    description
-}: PasswordDialogProps) {
+export function PasswordDialog({ isOpen, onOpenChange, onSave, title = '配置密码', description }: PasswordDialogProps) {
+    const { t } = useI18n();
     const [currentPassword, setCurrentPassword] = React.useState('');
     const inputRef = React.useRef<HTMLInputElement>(null);
 
@@ -48,7 +44,7 @@ export function PasswordDialog({
         <Dialog open={isOpen} onOpenChange={handleDialogClose}>
             <DialogContent className='border-white/20 bg-black text-white sm:max-w-[425px]'>
                 <DialogHeader>
-                    <DialogTitle className='text-white'>{title}</DialogTitle>
+                    <DialogTitle className='text-white'>{t(title)}</DialogTitle>
                     {description && <DialogDescription className='text-white/60'>{description}</DialogDescription>}
                 </DialogHeader>
                 <div className='grid gap-4 py-4'>
@@ -57,7 +53,7 @@ export function PasswordDialog({
                             ref={inputRef}
                             id='password-input'
                             type='password'
-                            placeholder='Enter your password'
+                            placeholder={t('请输入密码')}
                             value={currentPassword}
                             onChange={(e) => setCurrentPassword(e.target.value)}
                             className='col-span-1 border-white/20 bg-black text-white placeholder:text-white/40 focus:border-white/50 focus:ring-white/50'
@@ -76,7 +72,7 @@ export function PasswordDialog({
                         onClick={handleSave}
                         disabled={!currentPassword.trim()}
                         className='bg-white px-6 text-black hover:bg-white/90 disabled:bg-white/10 disabled:text-white/40'>
-                        Save
+                        {t('保存')}
                     </Button>
                 </DialogFooter>
             </DialogContent>

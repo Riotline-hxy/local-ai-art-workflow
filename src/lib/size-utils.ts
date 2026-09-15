@@ -8,30 +8,66 @@ export const GPT_IMAGE_2_MAX_EDGE = 3840;
 export const GPT_IMAGE_2_EDGE_MULTIPLE = 16;
 export const GPT_IMAGE_2_MAX_ASPECT = 3;
 
-export function validateGptImage2Size(width: number, height: number): SizeValidation {
+export function validateGptImage2Size(width: number, height: number, language: 'zh' | 'en' = 'en'): SizeValidation {
     if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-        return { valid: false, reason: 'Width and height must be positive numbers.' };
+        return {
+            valid: false,
+            reason: language === 'zh' ? '宽度和高度必须为正数。' : 'Width and height must be positive numbers.'
+        };
     }
     if (!Number.isInteger(width) || !Number.isInteger(height)) {
-        return { valid: false, reason: 'Width and height must be whole numbers.' };
+        return {
+            valid: false,
+            reason: language === 'zh' ? '宽度和高度必须为整数。' : 'Width and height must be whole numbers.'
+        };
     }
     if (width % GPT_IMAGE_2_EDGE_MULTIPLE !== 0 || height % GPT_IMAGE_2_EDGE_MULTIPLE !== 0) {
-        return { valid: false, reason: `Both edges must be multiples of ${GPT_IMAGE_2_EDGE_MULTIPLE}.` };
+        return {
+            valid: false,
+            reason:
+                language === 'zh'
+                    ? `宽度和高度都必须为 ${GPT_IMAGE_2_EDGE_MULTIPLE} 的倍数。`
+                    : `Both edges must be multiples of ${GPT_IMAGE_2_EDGE_MULTIPLE}.`
+        };
     }
     if (width > GPT_IMAGE_2_MAX_EDGE || height > GPT_IMAGE_2_MAX_EDGE) {
-        return { valid: false, reason: `Maximum edge is ${GPT_IMAGE_2_MAX_EDGE}px.` };
+        return {
+            valid: false,
+            reason:
+                language === 'zh'
+                    ? `单边最大为 ${GPT_IMAGE_2_MAX_EDGE} 像素。`
+                    : `Maximum edge is ${GPT_IMAGE_2_MAX_EDGE}px.`
+        };
     }
     const long = Math.max(width, height);
     const short = Math.min(width, height);
     if (long / short > GPT_IMAGE_2_MAX_ASPECT) {
-        return { valid: false, reason: `Aspect ratio (long:short) must be ≤ ${GPT_IMAGE_2_MAX_ASPECT}:1.` };
+        return {
+            valid: false,
+            reason:
+                language === 'zh'
+                    ? `长短边比不能超过 ${GPT_IMAGE_2_MAX_ASPECT}:1。`
+                    : `Aspect ratio (long:short) must be ≤ ${GPT_IMAGE_2_MAX_ASPECT}:1.`
+        };
     }
     const pixels = width * height;
     if (pixels < GPT_IMAGE_2_MIN_PIXELS) {
-        return { valid: false, reason: `Total pixels must be at least ${GPT_IMAGE_2_MIN_PIXELS.toLocaleString()}.` };
+        return {
+            valid: false,
+            reason:
+                language === 'zh'
+                    ? `总像素不能少于 ${GPT_IMAGE_2_MIN_PIXELS.toLocaleString()}。`
+                    : `Total pixels must be at least ${GPT_IMAGE_2_MIN_PIXELS.toLocaleString()}.`
+        };
     }
     if (pixels > GPT_IMAGE_2_MAX_PIXELS) {
-        return { valid: false, reason: `Total pixels must be no more than ${GPT_IMAGE_2_MAX_PIXELS.toLocaleString()}.` };
+        return {
+            valid: false,
+            reason:
+                language === 'zh'
+                    ? `总像素不能超过 ${GPT_IMAGE_2_MAX_PIXELS.toLocaleString()}。`
+                    : `Total pixels must be no more than ${GPT_IMAGE_2_MAX_PIXELS.toLocaleString()}.`
+        };
     }
     return { valid: true };
 }

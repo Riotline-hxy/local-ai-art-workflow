@@ -42,3 +42,8 @@ next-env.d.ts
 
 # generated images
 generated-images/
+
+.local-runtime-config.json
+.local-setup-token
+
+.local-runtime-config.json.*.tmp
