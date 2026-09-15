@@ -202,3 +202,16 @@ Automated tests use isolated configuration and mocks; they do not need real API 
 ## License and attribution
 
 [MIT](./LICENSE). Based on the original GPT Image Playground by Aljosa Asanovic. Preserve the original copyright and license notice when redistributing.
+
+
+## Multiple image providers
+
+Choose **Image API protocol** in the workbench. Auto mode selects GPT Images for GPT image models, Seedream JSON generation for Seedream, Gemini `generateContent` for Gemini image/Nano Banana, and generic OpenAI Images for other models. A manual Chat Completions override supports gateways that expose image models as chat endpoints. Overrides are saved per model in your browser.
+
+Use your existing image API key and Base URL. Gemini replaces a trailing `/v1` or `/v1beta` with `/v1beta/models/{model}:generateContent`. The catalog currently requires an OpenAI-compatible `/models` response; native provider catalogs are not universally supported. Model names alone cannot establish a gateway's protocol; select an override when needed.
+
+Responses support Base64, public HTTPS URLs, Data URLs, Gemini inline image parts and explicit chat image fields/Markdown images. URL downloads validate the destination and PNG/JPEG/WebP bytes, are limited to 30 MiB, and never receive the API key. Seedream and generic Images request Base64 where supported.
+
+Non-GPT adapters omit GPT-only quality, background, format, moderation and streaming parameters. Gemini/Chat and Grok use provider default dimensions. Seedream defaults to 2K (1024 square for Seedream 3); explicit sizes must meet model requirements. Seedream, Gemini and Chat currently accept one image per request. Masks require GPT Images. Generic edits use multipart; Grok uses JSON; Seedream and Gemini encode reference images inline. No automatic endpoint fallback or paid retry is performed.
+
+Live text-to-image checks on OpenLux, September 15, 2026: `gemini-2.5-flash-image`, `doubao-seedream-4-0-250828`, and `grok-imagine-image-2.0` returned real images. One model per provider was tested; Seedream/Grok were retried once explicitly with Base64 output. Other models and reference-image editing remain unverified against live providers.

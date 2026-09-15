@@ -71,6 +71,7 @@ export function buildImageRequest(input: AdapterInput, baseURL: string) {
 
 export async function callImageAdapter(input: AdapterInput, baseURL: string, apiKey: string, signal?: AbortSignal): Promise<unknown> {
     const request = buildImageRequest(input, baseURL);
+    const nativeGoogle = new URL(request.url).hostname === 'generativelanguage.googleapis.com';
     const multipart = resolveImageProtocol(input.model, input.protocol) === 'images' && input.mode === 'edit' && !/grok/i.test(input.model);
     const form = new FormData();
     if (multipart) {
@@ -79,7 +80,7 @@ export async function callImageAdapter(input: AdapterInput, baseURL: string, api
     }
     // A single upstream call: no hidden retries or paid endpoint probing.
     const response = await fetch(request.url, {
-        method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, ...(multipart ? {} : { 'Content-Type': 'application/json' }) },
+        method: 'POST', headers: { ...(nativeGoogle ? { 'x-goog-api-key': apiKey } : { Authorization: `Bearer ${apiKey}` }), ...(multipart ? {} : { 'Content-Type': 'application/json' }) },
         body: multipart ? form : JSON.stringify(request.body), signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(600_000)]) : AbortSignal.timeout(600_000)
     });
     const raw = await response.text();

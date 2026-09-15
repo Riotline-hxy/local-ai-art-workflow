@@ -203,3 +203,24 @@ npm run build
 ## 许可证与原项目
 
 采用 [MIT 许可证](./LICENSE)，基于 Aljosa Asanovic 的 GPT Image Playground。分发时请保留原有版权声明和许可证。
+
+
+## 多厂商生图接口
+
+工作台新增“图片接口协议”，默认按模型名自动选择，也可以手动覆盖；每个模型的选择保存在当前浏览器。使用原有图片 API Key 和 Base URL，服务端发送密钥，浏览器不接收密钥。
+
+| 模型 | 自动协议 | 说明 |
+| --- | --- | --- |
+| GPT Image | GPT Images | 保留原生成、编辑及实时预览 |
+| 豆包 Seedream | Seedream | JSON `/images/generations`；参考图使用 Data URL，暂限每次一张；Seedream 3 不支持参考图 |
+| Gemini image / Nano Banana | Gemini generateContent | `/v1beta/models/{model}:generateContent`；支持参考图，每次一张 |
+| Grok 及其他图片模型 | OpenAI Images | `/images/generations`；Grok 编辑使用 JSON，其他通用编辑使用 multipart |
+| 手动选择 Chat Completions | Chat Completions | 适用于将图片模型映射到 `/chat/completions` 的中转站，每次一张 |
+
+示例：中转站填 `https://your-provider.example/v1`，Gemini 原生适配会将末尾 `/v1` 换成 `/v1beta`。如果中转站只提供聊天兼容接口，请为 Gemini 手动选择 Chat Completions。直连 Google 可填 `https://generativelanguage.googleapis.com/v1beta`，但部分厂商原生模型目录格式不同，当前自动模型目录仍要求 OpenAI 兼容的 `/models` 返回格式；并非所有原生服务均已端到端兼容。
+
+豆包、Grok 优先请求 Base64；也支持返回 URL、Data URL 和 Gemini inlineData。URL 会在服务器下载并检查实际 PNG/JPEG/WebP 文件类型，不再假设所有返回都有 `b64_json`。仅支持公开 HTTPS 图片地址，下载上限 30 MiB；不向图片 CDN 转发 API Key。
+
+非 GPT 协议不发送 GPT 专用的质量、背景、输出格式、审核和实时预览参数。Gemini/聊天协议和 Grok 当前使用服务商默认尺寸；Seedream 默认自动尺寸为 2K（Seedream 3 为 1024×1024），手动尺寸必须满足对应版本限制。蒙版编辑目前只支持 GPT 协议。接口适配并不保证任意模型/中转站具有相同能力；报错时核对服务商文档，不会自动切换接口重试或额外批量生成。
+
+本地验证（2026-09-15，OpenLux）：`gemini-2.5-flash-image`、`doubao-seedream-4-0-250828`、`grok-imagine-image-2.0` 均返回真实生成图片；其他模型以及这三家的图生图暂未实测。每家只测试一个模型，豆包/Grok 在请求 Base64 后进行了第二次生成验证。

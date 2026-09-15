@@ -5,7 +5,7 @@ export function modelKind(model: Model): ModelKind {
     const endpoints = JSON.stringify(model.supported_endpoint_types || model.endpoints || '').toLowerCase();
     const output = JSON.stringify(model.output_modalities || '').toLowerCase();
     const type = typeof model.type === 'string' ? model.type.toLowerCase() : '';
-    if (/image/.test(output) || /image/.test(type) || /images\/(generations|edits)/.test(endpoints) || /gpt-image|dall-e|imagen|flux|(^|[-_.])image([-.]|$)|nano-banana|seedream|stable-diffusion|(^|[-_/])sdxl|gemini.*image|ideogram|recraft/.test(id)) return 'image';
+    if (/image/.test(output) || /image/.test(type) || /images\/(generations|edits)|image-generation|image-edit/.test(endpoints) || /gpt-image|dall-e|imagen|flux|(^|[-_.])image([-.]|$)|nano-banana|seedream|stable-diffusion|(^|[-_/])sdxl|gemini.*image|ideogram|recraft/.test(id)) return 'image';
     if (/embedding|whisper|tts|transcri|realtime|moderation|rerank|sora|veo|video|audio/.test(id + ' ' + type)) return 'other';
     if (/chat|text|language/.test(type) || /chat\/completions|responses/.test(endpoints) || /text/.test(output)) return 'text';
     // /models has no universal capability schema; recognize common chat families.
