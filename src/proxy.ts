@@ -8,7 +8,7 @@ export function proxy(request: NextRequest) {
     if (request.method === 'GET' && secret && invite && sameSecret(invite, secret)) {
         const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
         const requestPath = request.nextUrl.pathname || '/';
-        const destinationPath = requestPath === basePath || requestPath.startsWith(basePath + '/') ? requestPath : basePath + (requestPath.StartsWith('/') ? requestPath : '/' + requestPath);
+        const destinationPath = requestPath === basePath || requestPath.startsWith(basePath + '/') ? requestPath : basePath + (requestPath.startsWith('/') ? requestPath : '/' + requestPath);
         const destination = new URL(destinationPath || '/', process.env.PHOTO_PUBLIC_ORIGIN || request.url);
         response = NextResponse.redirect(destination, 303);
         response.cookies.set(accessCookie, sessionValue(secret), {
