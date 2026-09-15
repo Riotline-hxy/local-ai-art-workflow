@@ -1,5 +1,8 @@
 import { accessDenied } from '@/lib/private-access';
 import crypto from 'crypto';
+import { callImageAdapter, extractImages } from '@/lib/image-adapter';
+import { isImageProtocol, resolveImageProtocol } from '@/lib/image-protocol';
+import { resolveImage } from '@/lib/image-result';
 import fs from 'fs/promises';
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
@@ -79,7 +82,7 @@ const denied = accessDenied(request);
     try {
         const runtime = await getRuntimeConfig();
         if (!runtime.openaiApiKey) return NextResponse.json({ error: 'Configure the image API key in Settings.' }, { status: 503 });
-        const openai = new OpenAI({ apiKey: runtime.openaiApiKey, baseURL: runtime.openaiBaseUrl });
+        const openai = new OpenAI({ apiKey: runtime.openaiApiKey, baseURL: runtime.openaiBaseUrl, maxRetries: 0 });
         let effectiveStorageMode: 'fs' | 'indexeddb';
         const explicitMode = process.env.NEXT_PUBLIC_IMAGE_STORAGE_MODE;
         const isOnVercel = process.env.VERCEL === '1';
@@ -118,15 +121,10 @@ const denied = accessDenied(request);
 
         const mode = formData.get('mode') as 'generate' | 'edit' | null;
         const prompt = formData.get('prompt') as string | null;
-        const model =
-            (formData.get('model') as
-                | 'gpt-image-1'
-                | 'gpt-image-1-mini'
-                | 'gpt-image-1.5'
-                | 'gpt-image-2'
-                | 'gpt-image-2.5-sunburst'
-                | 'gpt-image-2.5-flare'
-                | null) || 'gpt-image-2';
+        const model = String(formData.get('model') || 'gpt-image-2');
+        const requestedProtocol = formData.get('imageProtocol') || 'auto';
+        if (!isImageProtocol(requestedProtocol)) return NextResponse.json({ error: 'Invalid image protocol' }, { status: 400 });
+        const protocol = resolveImageProtocol(model, requestedProtocol);
 
         console.log(`Mode: ${mode}, Model: ${model}, Prompt: ${prompt ? prompt.substring(0, 50) + '...' : 'N/A'}`);
 
@@ -140,7 +138,17 @@ const denied = accessDenied(request);
 
         let result: OpenAI.Images.ImagesResponse;
 
-        if (mode === 'generate') {
+        if (protocol !== 'gpt') {
+            if (mode !== 'generate' && mode !== 'edit') return NextResponse.json({ error: 'Invalid mode' }, { status: 400 });
+            const files = [...formData.entries()].filter(([key, value]) => key.startsWith('image_') && value instanceof File).map(([,value]) => value as File);
+            if (mode === 'edit' && !files.length) return NextResponse.json({ error: 'No reference images provided' }, { status: 400 });
+            const images = await Promise.all(files.map(async file => ({ data: Buffer.from(await file.arrayBuffer()).toString('base64'), mimeType: file.type || 'image/png' })));
+            const payload = await callImageAdapter({ model, prompt, mode, protocol, n: Math.max(1, Math.min(Number(formData.get('n')) || 1, 10)), size: String(formData.get('size') || 'auto'), images, hasMask: formData.get('mask') instanceof File }, runtime.openaiBaseUrl || 'https://api.openai.com/v1', runtime.openaiApiKey, request.signal);
+            const data = extractImages(payload);
+            if (!data.length) throw new Error(`接口没有返回图片（${protocol}）。可能是协议不匹配、模型拒绝或仅返回文本；请检查服务商文档并选择对应图片协议。 / No images returned; check the provider protocol.`);
+            // Non-GPT usage schemas must not be interpreted as GPT image token pricing.
+            result = { created: Date.now() / 1000, data };
+        } else if (mode === 'generate') {
             const n = parseInt((formData.get('n') as string) || '1', 10);
             // gpt-image-2 accepts arbitrary WxH strings that the SDK's narrow literal union doesn't express.
             const size = ((formData.get('size') as string) || '1024x1024') as OpenAI.Images.ImageGenerateParams['size'];
@@ -445,14 +453,10 @@ const denied = accessDenied(request);
 
         const savedImagesData = await Promise.all(
             result.data.map(async (imageData, index) => {
-                if (!imageData.b64_json) {
-                    console.error(`Image data ${index} is missing b64_json.`);
-                    throw new Error(`Image data at index ${index} is missing base64 data.`);
-                }
-                const buffer = Buffer.from(imageData.b64_json, 'base64');
+                const normalized = await resolveImage(imageData, new URL(runtime.openaiBaseUrl || 'https://api.openai.com').hostname);
+                const buffer = normalized.buffer;
                 const timestamp = Date.now();
-
-                const fileExtension = validateOutputFormat(formData.get('output_format'));
+                const fileExtension = normalized.format;
                 const filename = `${timestamp}-${index}.${fileExtension}`;
 
                 if (effectiveStorageMode === 'fs') {
@@ -465,7 +469,7 @@ const denied = accessDenied(request);
 
                 const imageResult: { filename: string; b64_json: string; path?: string; output_format: string } = {
                     filename: filename,
-                    b64_json: imageData.b64_json,
+                    b64_json: normalized.b64_json,
                     output_format: fileExtension
                 };
 

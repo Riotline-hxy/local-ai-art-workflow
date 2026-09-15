@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { IMAGE_PROTOCOLS, isImageProtocol, resolveImageProtocol, type ImageProtocol } from '@/lib/image-protocol';
 import { finishTiming, type WorkflowTiming } from '@/components/elapsed-time';
 import { SettingsDialog } from '@/components/settings-dialog';
 import { WorkflowPanel } from '@/components/workflow-panel';
@@ -75,6 +76,12 @@ type ApiImageResponseItem = {
 };
 
 export default function HomePage() {
+    const [protocolOverrides, setProtocolOverrides] = React.useState<Record<string, ImageProtocol>>({});
+    React.useEffect(() => {
+        queueMicrotask(() => {
+            try { const saved = JSON.parse(localStorage.getItem('photo-image-protocols') || '{}'); setProtocolOverrides(Object.fromEntries(Object.entries(saved).filter(([,v]) => isImageProtocol(v))) as Record<string, ImageProtocol>); } catch { /* Optional browser preferences. */ }
+        });
+    }, []);
     const [mode, setMode] = React.useState<'generate' | 'edit'>('generate');
     const [isPasswordRequiredByBackend, setIsPasswordRequiredByBackend] = React.useState<boolean | null>(null);
     const [clientPasswordHash, setClientPasswordHash] = React.useState<string | null>(null);
@@ -437,6 +444,7 @@ export default function HomePage() {
             }
             setPromptRefinement({ original: originalPrompt, refined: refinedPrompt, status: 'sending' });
             apiFormData.append('mode', mode);
+            apiFormData.append('imageProtocol', protocolOverrides[formData.model] || 'auto');
 
         // Add streaming parameters if enabled
         if (enableStreaming) {
@@ -1028,6 +1036,22 @@ export default function HomePage() {
                     {modelsLoading ? <span>{t('正在同步模型…', 'Syncing models…')}</span> : modelRefreshAt && <span>{t('上次同步', 'Last synced')} {new Date(modelRefreshAt).toLocaleTimeString(language === 'zh' ? 'zh-CN' : 'en-US')}</span>}
                 </div>
                 {modelErrors.image && <p role='alert' className='rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-sm text-amber-200'>{t('图片模型列表未就绪，请在设置中检查图片 API，再刷新模型。', 'Image models are unavailable. Check the image API in Settings and refresh.')}</p>}
+                <section className='rounded-xl border border-white/10 bg-white/[.03] p-3 text-xs text-white/65'>
+                    <label className='flex flex-wrap items-center gap-3'>
+                        {t('图片接口协议', 'Image API protocol')}
+                        <select disabled={isLoading} className='max-w-full rounded-lg border border-white/15 bg-[#101318] p-2 text-white' value={protocolOverrides[mode === 'generate' ? genModel : editModel] || 'auto'} onChange={event => {
+                            const value = event.target.value;
+                            if (!isImageProtocol(value)) return;
+                            const next = { ...protocolOverrides, [mode === 'generate' ? genModel : editModel]: value };
+                            setProtocolOverrides(next);
+                            try { localStorage.setItem('photo-image-protocols', JSON.stringify(next)); } catch { /* Keep in memory. */ }
+                        }}>
+                            {IMAGE_PROTOCOLS.map(p => <option key={p} value={p}>{({ auto: t('自动识别', 'Auto detect'), gpt: 'GPT Images', images: 'OpenAI Images', seedream: 'Seedream / 豆包', gemini: 'Gemini generateContent', chat: 'Chat Completions' })[p]}</option>)}
+                        </select>
+                        <span>{t('当前：', 'Active: ')}{resolveImageProtocol(mode === 'generate' ? genModel : editModel, protocolOverrides[mode === 'generate' ? genModel : editModel] || 'auto')}</span>
+                    </label>
+                    <p className='mt-2 leading-5'>{t('按模型记住选择。豆包/Gemini/聊天协议请设为 1 张；非 GPT 协议不发送质量、背景、格式、审核或实时预览等 GPT 专用参数，以服务商默认值为准。Gemini/聊天协议及 Grok 的尺寸也由服务商决定。中转站协议不同可手动切换，不会自动重试扣费。', 'Saved per model. Use one image for Seedream, Gemini and Chat. Non-GPT protocols omit GPT-only quality, background, format, moderation and live preview options. Gemini, Chat and Grok also use provider default dimensions. Override the protocol for your gateway; no automatic paid retries.')}</p>
+                </section>
                 <WorkflowPanel timing={workflowTiming} state={promptRefinement} refinerEnabled={refinerEnabled} imageModel={mode === 'generate' ? genModel : editModel} textModel={textModel} />
                 <div className='grid grid-cols-1 gap-6 lg:grid-cols-2'>
                     <div className='relative flex h-[70vh] min-h-[600px] flex-col lg:col-span-1'>
