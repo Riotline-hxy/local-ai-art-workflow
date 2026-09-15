@@ -453,7 +453,7 @@ const denied = accessDenied(request);
 
         const savedImagesData = await Promise.all(
             result.data.map(async (imageData, index) => {
-                const normalized = await resolveImage(imageData, new URL(runtime.openaiBaseUrl || 'https://api.openai.com').hostname);
+                const normalized = await resolveImage(imageData);
                 const buffer = normalized.buffer;
                 const timestamp = Date.now();
                 const fileExtension = normalized.format;

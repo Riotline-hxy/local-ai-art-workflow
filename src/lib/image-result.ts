@@ -9,7 +9,8 @@ for (const [ip, prefix] of [['0.0.0.0',8],['10.0.0.0',8],['100.64.0.0',10],['127
 for (const [ip,prefix] of [['::',128],['::1',128],['fc00::',7],['fe80::',10],['ff00::',8],['::ffff:0:0',96]] as const) blocked.addSubnet(ip,prefix,'ipv6');
 export function isPublicImageAddress(ip: string) {
     const version = isIP(ip);
-    return !!version && !blocked.check(ip, version === 4 ? 'ipv4' : 'ipv6');
+    if (!version) return false;
+    return !blocked.check(ip, version === 4 ? 'ipv4' : 'ipv6');
 }
 
 async function downloadImage(url: string, redirects = 0): Promise<Buffer> {
@@ -53,7 +54,7 @@ export function decodeImage(buffer: Buffer) {
     if (!format) throw new Error('接口返回的内容不是支持的 PNG/JPEG/WebP 图片。 / Invalid image bytes.');
     return { buffer, format, b64_json: buffer.toString('base64') };
 }
-export async function resolveImage(source: ImageSource, trustedHost?: string) {
+export async function resolveImage(source: ImageSource) {
     const value = source.b64_json || source.url;
     if (!value) throw new Error('图片响应没有图片数据或 URL。 / No image data or URL.');
     if (value.startsWith('data:')) {
@@ -66,8 +67,5 @@ export async function resolveImage(source: ImageSource, trustedHost?: string) {
         if (value.length > MAX_BYTES * 1.4) throw new Error('Image exceeds 30 MiB');
         return decodeImage(Buffer.from(value,'base64'));
     }
-    const host = (() => { try { return new URL(value).hostname; } catch { return ''; } })();
-    // Gateways sometimes return an internal URL on their own public host; callers may explicitly trust that host.
-    if (trustedHost && host === trustedHost) return decodeImage(await downloadImage(value));
     return decodeImage(await downloadImage(value));
 }
