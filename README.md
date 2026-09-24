@@ -16,16 +16,25 @@ Based on [alasano/gpt-image-playground](https://github.com/alasano/gpt-image-pla
 - Switch between Chinese and English, including settings and chat.
 - Browse image history, download images, and send an existing image back to the editor.
 
-## Image examples
+## Interface preview
 
-Sample images made with the workbench. Select any image to view it full size.
+The screenshots below show the actual workbench UI, including the image workflow, provider settings, text-model controls, and the standalone chat page. They use simulated model data and contain no API keys or private content.
 
 <p align="center">
-  <a href="./docs/showcase/astronaut-cat-window.jpg"><img src="./docs/showcase/astronaut-cat-window.jpg" width="31%" alt="Astronaut cat looking out of a spacecraft window" /></a>
-  <a href="./docs/showcase/astronaut-cat-wave.jpg"><img src="./docs/showcase/astronaut-cat-wave.jpg" width="31%" alt="Astronaut cat waving in space" /></a>
-  <a href="./docs/showcase/astronaut-cat-spacewalk.jpg"><img src="./docs/showcase/astronaut-cat-spacewalk.jpg" width="31%" alt="Astronaut cat floating among the stars" /></a>
+  <a href="./docs/ui-screenshots/image-workbench.png"><img src="./docs/ui-screenshots/image-workbench.png" width="64%" alt="Image workbench with workflow steps, prompt preview, controls, and generated image" /></a>
 </p>
-<p align="center"><sub>Space window · A friendly wave · Floating among the stars</sub></p>
+<p align="center"><sub>Image workbench · workflow status · prompt preview · image controls</sub></p>
+
+<p align="center">
+  <a href="./docs/ui-screenshots/settings-image-api.png"><img src="./docs/ui-screenshots/settings-image-api.png" width="48%" alt="Image API settings dialog" /></a>
+  <a href="./docs/ui-screenshots/settings-text-model.png"><img src="./docs/ui-screenshots/settings-text-model.png" width="48%" alt="Text model and prompt refinement settings dialog" /></a>
+</p>
+<p align="center"><sub>Image API settings · Text model, effort, and prompt-refinement settings</sub></p>
+
+<p align="center">
+  <a href="./docs/ui-screenshots/text-chat.png"><img src="./docs/ui-screenshots/text-chat.png" width="64%" alt="Standalone text chat page with model and effort controls" /></a>
+</p>
+<p align="center"><sub>Standalone text chat · model selector · reasoning effort · response timing</sub></p>
 
 ## Local setup
 

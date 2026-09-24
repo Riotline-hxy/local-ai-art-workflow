@@ -16,16 +16,25 @@
 - 中文 / English 界面切换，覆盖工作台、聊天和设置页面。
 - 图片历史、下载，以及将已有图片送回编辑器继续修改。
 
-## 成品预览
+## 界面预览
 
-以下图片由本工作台生成。点击图片可查看原尺寸。
+下面展示的是工作台本身，包括图片工作流、接口设置、文本模型控制和独立聊天页面。截图使用模拟模型数据，不包含 API Key 或私人内容。
 
 <p align="center">
-  <a href="./docs/showcase/astronaut-cat-window.jpg"><img src="./docs/showcase/astronaut-cat-window.jpg" width="31%" alt="宇航猫在舷窗旁眺望太空" /></a>
-  <a href="./docs/showcase/astronaut-cat-wave.jpg"><img src="./docs/showcase/astronaut-cat-wave.jpg" width="31%" alt="宇航猫在太空中挥爪" /></a>
-  <a href="./docs/showcase/astronaut-cat-spacewalk.jpg"><img src="./docs/showcase/astronaut-cat-spacewalk.jpg" width="31%" alt="宇航猫漂浮在星空中" /></a>
+  <a href="./docs/ui-screenshots/image-workbench.png"><img src="./docs/ui-screenshots/image-workbench.png" width="64%" alt="包含工作链、提示词预览、控件和生成结果的图片工作台" /></a>
 </p>
-<p align="center"><sub>舷窗远眺 · 挥爪致意 · 星际漫游</sub></p>
+<p align="center"><sub>图片工作台 · 工作链状态 · 提示词预览 · 生图控件</sub></p>
+
+<p align="center">
+  <a href="./docs/ui-screenshots/settings-image-api.png"><img src="./docs/ui-screenshots/settings-image-api.png" width="48%" alt="图片 API 设置窗口" /></a>
+  <a href="./docs/ui-screenshots/settings-text-model.png"><img src="./docs/ui-screenshots/settings-text-model.png" width="48%" alt="文本模型和提示词整理设置窗口" /></a>
+</p>
+<p align="center"><sub>图片 API 设置 · 文本模型、推理强度和提示词整理设置</sub></p>
+
+<p align="center">
+  <a href="./docs/ui-screenshots/text-chat.png"><img src="./docs/ui-screenshots/text-chat.png" width="64%" alt="包含模型和推理强度控件的独立文本聊天页面" /></a>
+</p>
+<p align="center"><sub>独立文本聊天 · 模型选择 · 推理强度 · 回复用时</sub></p>
 
 ## 本地启动教程
 
