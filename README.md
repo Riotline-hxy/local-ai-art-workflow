@@ -16,6 +16,17 @@ Based on [alasano/gpt-image-playground](https://github.com/alasano/gpt-image-pla
 - Switch between Chinese and English, including settings and chat.
 - Browse image history, download images, and send an existing image back to the editor.
 
+## Image examples
+
+Sample images made with the workbench. Select any image to view it full size.
+
+<p align="center">
+  <a href="./docs/showcase/astronaut-cat-window.jpg"><img src="./docs/showcase/astronaut-cat-window.jpg" width="31%" alt="Astronaut cat looking out of a spacecraft window" /></a>
+  <a href="./docs/showcase/astronaut-cat-wave.jpg"><img src="./docs/showcase/astronaut-cat-wave.jpg" width="31%" alt="Astronaut cat waving in space" /></a>
+  <a href="./docs/showcase/astronaut-cat-spacewalk.jpg"><img src="./docs/showcase/astronaut-cat-spacewalk.jpg" width="31%" alt="Astronaut cat floating among the stars" /></a>
+</p>
+<p align="center"><sub>Space window · A friendly wave · Floating among the stars</sub></p>
+
 ## Local setup
 
 ### 1. Install

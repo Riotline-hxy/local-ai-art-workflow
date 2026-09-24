@@ -16,6 +16,17 @@
 - 中文 / English 界面切换，覆盖工作台、聊天和设置页面。
 - 图片历史、下载，以及将已有图片送回编辑器继续修改。
 
+## 成品预览
+
+以下图片由本工作台生成。点击图片可查看原尺寸。
+
+<p align="center">
+  <a href="./docs/showcase/astronaut-cat-window.jpg"><img src="./docs/showcase/astronaut-cat-window.jpg" width="31%" alt="宇航猫在舷窗旁眺望太空" /></a>
+  <a href="./docs/showcase/astronaut-cat-wave.jpg"><img src="./docs/showcase/astronaut-cat-wave.jpg" width="31%" alt="宇航猫在太空中挥爪" /></a>
+  <a href="./docs/showcase/astronaut-cat-spacewalk.jpg"><img src="./docs/showcase/astronaut-cat-spacewalk.jpg" width="31%" alt="宇航猫漂浮在星空中" /></a>
+</p>
+<p align="center"><sub>舷窗远眺 · 挥爪致意 · 星际漫游</sub></p>
+
 ## 本地启动教程
 
 ### 第一步：安装环境和依赖
