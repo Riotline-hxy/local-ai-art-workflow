@@ -34,6 +34,6 @@ curl -fsS https://strategy.noryx.cn/photo/api/local-config
 npm audit --omit=dev --registry=https://registry.npmjs.org
 ```
 
-更新时保留 `/etc/photo-workbench.env` 和整个 `/srv/photo-workbench`，上传新源码并重新 `npm ci --include=dev`、按上面环境构建，再 `systemctl restart photo-workbench`。长时间生图由 Caddy 900 秒读写超时覆盖；API 服务自身还会按适配器设置超时。
+更新时保留 `/etc/photo-workbench.env` 和整个 `/srv/photo-workbench`，先备份配置与图片，再在独立发布目录上传源码、安装依赖并按上面环境构建。不要在运行服务的 `.next` 上直接构建。新构建通过后，只停止 `photo-workbench`，把原目录保留为回滚副本，再将发布目录切换到 `/opt/photo-workbench` 并启动；健康检查失败则切回旧目录。依赖锁文件未变化时可以复用现有 `node_modules`。长时间生图由 Caddy 900 秒读写超时覆盖；API 服务自身还会按适配器设置超时。
 
 2026-10-14 部署时已将 Next.js、eslint-config-next 更新到 16.4.0，sharp 到 0.35.5，source-map-js 到 1.2.2，并修复旧 brace-expansion override。生产依赖审计为 0 项；完整审计仍有 5 项来自开发工具的 braces/micromatch/fast-glob 链，没有执行破坏性降级。服务器与本地构建、lint 和项目测试已通过；详细实测记录见服务器工作区 `photo-workbench/README.md`。

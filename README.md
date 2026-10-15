@@ -9,6 +9,7 @@ Based on [alasano/gpt-image-playground](https://github.com/alasano/gpt-image-pla
 ## Features
 
 - Generate images, edit uploads, and draw or upload edit masks.
+- Add reference images by drag and drop, file selection, or paste. Drop multiple PNG/JPG/WebP files to append them, up to 10 images; unsupported files and overflow receive inline feedback.
 - Follow the workflow: prompt refinement → final prompt preview → image request → completed image. The final prompt remains visible afterward.
 - Use independent text chat with model and reasoning-effort selectors.
 - Fetch separate image and text model lists from your providers' `/models` endpoints, with manual refresh.

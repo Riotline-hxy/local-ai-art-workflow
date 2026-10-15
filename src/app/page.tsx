@@ -117,6 +117,20 @@ export default function HomePage() {
 
     const [editImageFiles, setEditImageFiles] = React.useState<File[]>([]);
     const [editSourceImagePreviewUrls, setEditSourceImagePreviewUrls] = React.useState<string[]>([]);
+    const editPreviewUrlsRef = React.useRef<Set<string>>(new Set());
+
+    React.useEffect(() => {
+        const currentUrls = new Set(editSourceImagePreviewUrls.filter((url) => url.startsWith('blob:')));
+        editPreviewUrlsRef.current.forEach((url) => {
+            if (!currentUrls.has(url)) URL.revokeObjectURL(url);
+        });
+        editPreviewUrlsRef.current = currentUrls;
+    }, [editSourceImagePreviewUrls]);
+
+    React.useEffect(() => () => {
+        editPreviewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+        editPreviewUrlsRef.current.clear();
+    }, []);
     const [editPrompt, setEditPrompt] = React.useState('');
     const [editN, setEditN] = React.useState([1]);
     const [editSize, setEditSize] = React.useState<EditingFormData['size']>('auto');
@@ -215,12 +229,6 @@ export default function HomePage() {
     }, []);
 
     React.useEffect(() => {
-        return () => {
-            editSourceImagePreviewUrls.forEach((url) => URL.revokeObjectURL(url));
-        };
-    }, [editSourceImagePreviewUrls]);
-
-    React.useEffect(() => {
         let cancelled = false;
 
         queueMicrotask(() => {
@@ -292,12 +300,6 @@ export default function HomePage() {
     }, [history, isInitialLoad]);
 
     React.useEffect(() => {
-        return () => {
-            editSourceImagePreviewUrls.forEach((url) => URL.revokeObjectURL(url));
-        };
-    }, [editSourceImagePreviewUrls]);
-
-    React.useEffect(() => {
         let cancelled = false;
 
         queueMicrotask(() => {
@@ -322,12 +324,7 @@ export default function HomePage() {
 
     React.useEffect(() => {
         const handlePaste = (event: ClipboardEvent) => {
-            if (mode !== 'edit' || !event.clipboardData) {
-                return;
-            }
-
-            if (editImageFiles.length >= MAX_EDIT_IMAGES) {
-                alert(`Cannot paste: Maximum of ${MAX_EDIT_IMAGES} images reached.`);
+            if (mode !== 'edit' || isLoading || isSendingToEdit || !event.clipboardData) {
                 return;
             }
 
@@ -337,6 +334,11 @@ export default function HomePage() {
                     const file = items[i].getAsFile();
                     if (file) {
                         event.preventDefault();
+
+                        if (editImageFiles.length >= MAX_EDIT_IMAGES) {
+                            alert(t(`最多只能添加 ${MAX_EDIT_IMAGES} 张参考图。`, `You can add up to ${MAX_EDIT_IMAGES} reference images.`));
+                            return;
+                        }
 
                         const previewUrl = URL.createObjectURL(file);
 
@@ -354,7 +356,7 @@ export default function HomePage() {
         return () => {
             window.removeEventListener('paste', handlePaste);
         };
-    }, [mode, editImageFiles.length]);
+    }, [mode, isLoading, isSendingToEdit, editImageFiles.length, t]);
 
     async function sha256Client(text: string): Promise<string> {
         const encoder = new TextEncoder();
@@ -911,8 +913,6 @@ export default function HomePage() {
 
             const newFile = new File([blob], filename, { type: mimeType });
             const newPreviewUrl = URL.createObjectURL(blob);
-
-            editSourceImagePreviewUrls.forEach((url) => URL.revokeObjectURL(url));
 
             setEditImageFiles([newFile]);
             setEditSourceImagePreviewUrls([newPreviewUrl]);

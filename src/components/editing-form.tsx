@@ -179,6 +179,16 @@ export function EditingForm({
     const { t, language } = useI18n();
     const modelOptions = [...new Set(availableModels ?? [])];
     const [firstImagePreviewUrl, setFirstImagePreviewUrl] = React.useState<string | null>(null);
+    const [isDraggingImages, setIsDraggingImages] = React.useState(false);
+    const [uploadNotice, setUploadNotice] = React.useState<{ invalid: boolean; overflow: boolean } | null>(null);
+    const imageInputRef = React.useRef<HTMLInputElement>(null);
+    const dragDepthRef = React.useRef(0);
+    const imageCountRef = React.useRef(imageFiles.length);
+    const uploadDisabled = isLoading || imageFiles.length >= maxImages;
+
+    React.useEffect(() => {
+        imageCountRef.current = imageFiles.length;
+    }, [imageFiles.length]);
 
     const isGptImage2 = editModel === 'gpt-image-2';
     const customSizeValidation =
@@ -394,45 +404,63 @@ export function EditingForm({
         }, 'image/png');
     };
 
+    const addImageFiles = (files: File[]) => {
+        if (isLoading || files.length === 0) return;
+
+        const supportedFiles = files.filter((file) =>
+            ['image/png', 'image/jpeg', 'image/webp'].includes(file.type) ||
+            ((!file.type || file.type === 'application/octet-stream') && /\.(png|jpe?g|webp)$/i.test(file.name))
+        );
+        const remaining = Math.max(0, maxImages - imageCountRef.current);
+        const newFiles = supportedFiles.slice(0, remaining);
+        setUploadNotice({ invalid: supportedFiles.length !== files.length, overflow: supportedFiles.length > remaining });
+        if (newFiles.length === 0) return;
+
+        // Synchronous previews keep consecutive drops and their files in the same order.
+        const newUrls = newFiles.map((file) => URL.createObjectURL(file));
+        imageCountRef.current += newFiles.length;
+        setImageFiles((prevFiles) => [...prevFiles, ...newFiles]);
+        setSourceImagePreviewUrls((prevUrls) => [...prevUrls, ...newUrls]);
+    };
+
     const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        if (event.target.files) {
-            const newFiles = Array.from(event.target.files);
-            const totalFiles = imageFiles.length + newFiles.length;
+        addImageFiles(Array.from(event.target.files ?? []));
+        event.target.value = '';
+    };
 
-            if (totalFiles > maxImages) {
-                alert(t(`最多只能选择 ${maxImages} 张图片。`, `You can only select up to ${maxImages} images.`));
-                const allowedNewFiles = newFiles.slice(0, maxImages - imageFiles.length);
-                if (allowedNewFiles.length === 0) {
-                    event.target.value = '';
-                    return;
-                }
-                newFiles.splice(allowedNewFiles.length);
-            }
+    const isFileDrag = (event: React.DragEvent) => Array.from(event.dataTransfer.types).includes('Files');
 
-            setImageFiles((prevFiles) => [...prevFiles, ...newFiles]);
+    const handleImageDragEnter = (event: React.DragEvent) => {
+        if (!isFileDrag(event)) return;
+        event.preventDefault();
+        dragDepthRef.current += 1;
+        if (!uploadDisabled) setIsDraggingImages(true);
+    };
 
-            const newFilePromises = newFiles.map((file) => {
-                return new Promise<string>((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => resolve(reader.result as string);
-                    reader.onerror = reject;
-                    reader.readAsDataURL(file);
-                });
-            });
+    const handleImageDragOver = (event: React.DragEvent) => {
+        if (!isFileDrag(event)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = uploadDisabled ? 'none' : 'copy';
+    };
 
-            Promise.all(newFilePromises)
-                .then((newUrls) => {
-                    setSourceImagePreviewUrls((prevUrls) => [...prevUrls, ...newUrls]);
-                })
-                .catch((error) => {
-                    console.error('Error reading new image files:', error);
-                });
+    const handleImageDragLeave = () => {
+        dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+        if (dragDepthRef.current === 0) setIsDraggingImages(false);
+    };
 
-            event.target.value = '';
-        }
+    const handleImageDrop = (event: React.DragEvent) => {
+        if (!isFileDrag(event)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        dragDepthRef.current = 0;
+        setIsDraggingImages(false);
+        addImageFiles(Array.from(event.dataTransfer.files));
     };
 
     const handleRemoveImage = (indexToRemove: number) => {
+        if (isLoading) return;
+        imageCountRef.current = Math.max(0, imageCountRef.current - 1);
+        setUploadNotice(null);
         setImageFiles((prevFiles) => prevFiles.filter((_, index) => index !== indexToRemove));
         setSourceImagePreviewUrls((prevUrls) => prevUrls.filter((_, index) => index !== indexToRemove));
     };
@@ -680,24 +708,64 @@ export function EditingForm({
                     </div>
 
                     <div className='space-y-2'>
-                        <Label className='text-white'>{t('参考图片（最多 10 张）')}</Label>
-                        <Label
-                            htmlFor='image-files-input'
-                            className='flex h-10 w-full cursor-pointer items-center justify-between rounded-md border border-white/20 bg-black px-3 py-2 text-sm transition-colors hover:bg-white/5'>
-                            <span className='truncate pr-2 text-white/60'>{displayFileNames(imageFiles)}</span>
-                            <span className='flex shrink-0 items-center gap-1.5 rounded-md bg-white/10 px-3 py-1 text-xs font-medium text-white/80 hover:bg-white/20'>
-                                <Upload className='h-3 w-3' /> {t('选择图片…')}
-                            </span>
-                        </Label>
+                        <div className='flex items-center justify-between gap-2'>
+                            <Label id='reference-images-label' className='text-white'>
+                                {t(`参考图片（最多 ${maxImages} 张）`, `Reference images (up to ${maxImages})`)}
+                            </Label>
+                            <span className='text-sm text-white/70'>{imageFiles.length} / {maxImages}</span>
+                        </div>
+                        <div
+                            id='reference-image-dropzone'
+                            onDragEnter={handleImageDragEnter}
+                            onDragOver={handleImageDragOver}
+                            onDragLeave={handleImageDragLeave}
+                            onDrop={handleImageDrop}
+                            data-dragging={isDraggingImages && !uploadDisabled}
+                            className={`rounded-md border border-dashed transition-colors motion-reduce:transition-none ${
+                                isDraggingImages && !uploadDisabled
+                                    ? 'border-white bg-white/15'
+                                    : 'border-white/30 bg-white/[0.02]'
+                            }`}>
+                            <button
+                                type='button'
+                                onClick={() => imageInputRef.current?.click()}
+                                disabled={uploadDisabled}
+                                aria-labelledby='reference-images-label reference-image-upload-action'
+                                aria-describedby='reference-image-upload-help reference-image-upload-notice'
+                                className='flex min-h-28 w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-md px-3 py-4 text-center text-sm text-white transition-colors hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:pointer-events-none disabled:opacity-60 motion-reduce:transition-none'>
+                                <UploadCloud className='h-5 w-5 text-white/80' aria-hidden='true' />
+                                <span id='reference-image-upload-action' className='font-medium'>
+                                    {isLoading
+                                        ? t('编辑中，暂时无法添加图片', 'Editing in progress; uploads paused')
+                                        : imageFiles.length >= maxImages
+                                          ? t('参考图已满，移除后可继续添加', 'Remove an image to add another')
+                                          : isDraggingImages
+                                            ? t('松开即可添加参考图', 'Drop to add reference images')
+                                            : t('拖拽图片到这里，或点击选择', 'Drag images here or click to choose')}
+                                </span>
+                                <span id='reference-image-upload-help' className='text-xs text-white/70'>
+                                    PNG / JPG / WebP · {t('支持多张追加', 'Add multiple images')}
+                                </span>
+                                {imageFiles.length > 0 && (
+                                    <span className='max-w-full truncate text-xs text-white/70'>{displayFileNames(imageFiles)}</span>
+                                )}
+                            </button>
+                        </div>
                         <Input
+                            ref={imageInputRef}
                             id='image-files-input'
                             type='file'
                             accept='image/png, image/jpeg, image/webp'
                             multiple
                             onChange={handleImageFileChange}
-                            disabled={isLoading || imageFiles.length >= maxImages}
-                            className='sr-only'
+                            disabled={uploadDisabled}
+                            className='hidden'
                         />
+                        <p id='reference-image-upload-notice' role='status' className='text-sm text-amber-300'>
+                            {uploadNotice?.invalid && t('已跳过不支持的文件，请使用 PNG、JPG 或 WebP。', 'Unsupported files skipped. Use PNG, JPG or WebP.')}
+                            {uploadNotice?.invalid && uploadNotice?.overflow && ' '}
+                            {uploadNotice?.overflow && t(`最多 ${maxImages} 张，已按剩余名额添加。`, `Up to ${maxImages} images; only available slots were filled.`)}
+                        </p>
                         {sourceImagePreviewUrls.length > 0 && (
                             <div className='flex space-x-2 overflow-x-auto pt-2'>
                                 {sourceImagePreviewUrls.map((url, index) => (
@@ -716,6 +784,7 @@ export function EditingForm({
                                             size='icon'
                                             className='absolute top-0 right-0 h-5 w-5 translate-x-1/3 -translate-y-1/3 transform rounded-full bg-red-600 p-0.5 text-white hover:bg-red-700'
                                             onClick={() => handleRemoveImage(index)}
+                                            disabled={isLoading}
                                             aria-label={t(`移除图片 ${index + 1}`, `Remove image ${index + 1}`)}>
                                             <X className='h-3 w-3' />
                                         </Button>
