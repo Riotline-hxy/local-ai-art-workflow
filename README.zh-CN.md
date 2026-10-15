@@ -17,25 +17,33 @@
 - 中文 / English 界面切换，覆盖工作台、聊天和设置页面。
 - 图片历史、下载，以及将已有图片送回编辑器继续修改。
 
+## 最近更新 — 2026-10-16
+
+- **参考图拖拽上传**：进入“图生图”，将一张或多张 PNG/JPG/WebP 拖入参考图区即可按顺序追加，最多 10 张；不支持的文件和超额情况会在区域内提示。保留点击选择与粘贴图片。
+- 修复追加图片后旧参考图预览可能失效的问题；图片请求期间暂停上传与移除操作。
+- README 配图更新为六张最新截图，展示中文和英文工作台、历史记录与设置。
+
 ## 界面预览
 
-下面展示的是工作台本身，包括图片工作流、接口设置、文本模型控制和独立聊天页面。截图使用模拟模型数据，不包含 API Key 或私人内容。
+下面展示当前工作台、图片结果示例、历史记录和 API 设置的中英文界面。设置截图中的服务商 Base URL 已打码，密钥框仅显示已保存提示。点击图片可查看原图。
 
 <p align="center">
-  <a href="./docs/ui-screenshots/image-workbench.png"><img src="./docs/ui-screenshots/image-workbench.png" width="64%" alt="包含工作链、提示词预览、控件和生成结果的图片工作台" /></a>
+  <a href="./docs/ui-screenshots/workbench-zh.png"><img src="./docs/ui-screenshots/workbench-zh.png" width="48%" alt="中文图生图工作台，包含已完成工作链、最终提示词、参考图和图片结果" /></a>
+  <a href="./docs/ui-screenshots/workbench-en.png"><img src="./docs/ui-screenshots/workbench-en.png" width="48%" alt="英文图片工作台，包含生成控件和图片结果示例" /></a>
 </p>
-<p align="center"><sub>图片工作台 · 工作链状态 · 提示词预览 · 生图控件</sub></p>
+<p align="center"><sub>图片工作台 · 中文 / English</sub></p>
 
 <p align="center">
-  <a href="./docs/ui-screenshots/settings-image-api.png"><img src="./docs/ui-screenshots/settings-image-api.png" width="48%" alt="图片 API 设置窗口" /></a>
-  <a href="./docs/ui-screenshots/settings-text-model.png"><img src="./docs/ui-screenshots/settings-text-model.png" width="48%" alt="文本模型和提示词整理设置窗口" /></a>
+  <a href="./docs/ui-screenshots/history-zh.png"><img src="./docs/ui-screenshots/history-zh.png" width="48%" alt="中文历史记录，展示图片示例、模型、耗时与估算费用" /></a>
+  <a href="./docs/ui-screenshots/history-en.png"><img src="./docs/ui-screenshots/history-en.png" width="48%" alt="英文历史记录，展示图片示例、模型、耗时与估算费用" /></a>
 </p>
-<p align="center"><sub>图片 API 设置 · 文本模型、推理强度和提示词整理设置</sub></p>
+<p align="center"><sub>历史记录 · 中文 / English</sub></p>
 
 <p align="center">
-  <a href="./docs/ui-screenshots/text-chat.png"><img src="./docs/ui-screenshots/text-chat.png" width="64%" alt="包含模型和推理强度控件的独立文本聊天页面" /></a>
+  <a href="./docs/ui-screenshots/settings-zh.png"><img src="./docs/ui-screenshots/settings-zh.png" width="48%" alt="中文 API 设置，Base URL 已打码，未显示密钥原文" /></a>
+  <a href="./docs/ui-screenshots/settings-en.png"><img src="./docs/ui-screenshots/settings-en.png" width="48%" alt="英文 API 设置，Base URL 已打码，未显示密钥原文" /></a>
 </p>
-<p align="center"><sub>独立文本聊天 · 模型选择 · 推理强度 · 回复用时</sub></p>
+<p align="center"><sub>API 设置 · 中文 / English</sub></p>
 
 ## 本地启动教程
 

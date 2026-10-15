@@ -17,25 +17,33 @@ Based on [alasano/gpt-image-playground](https://github.com/alasano/gpt-image-pla
 - Switch between Chinese and English, including settings and chat.
 - Browse image history, download images, and send an existing image back to the editor.
 
+## Latest update — 2026-10-16
+
+- **Drag-and-drop reference uploads:** in image-to-image mode, drop one or more PNG/JPG/WebP files into the reference area. Images append in order, up to 10; unsupported files and excess images receive inline feedback. Click-to-select and paste remain available.
+- Fixed reference previews disappearing after adding more images. Uploads and removal pause while an image request is running.
+- Replaced the README gallery with six current screenshots showing the Chinese and English workbench, history, and settings.
+
 ## Interface preview
 
-The screenshots below show the actual workbench UI, including the image workflow, provider settings, text-model controls, and the standalone chat page. They use simulated model data and contain no API keys or private content.
+These screenshots show the current workbench, a sample image result, history, and API settings in Chinese and English. Settings screenshots have the provider Base URL obscured; API key fields display only the saved-key placeholder. Click an image to view it at full size.
 
 <p align="center">
-  <a href="./docs/ui-screenshots/image-workbench.png"><img src="./docs/ui-screenshots/image-workbench.png" width="64%" alt="Image workbench with workflow steps, prompt preview, controls, and generated image" /></a>
+  <a href="./docs/ui-screenshots/workbench-zh.png"><img src="./docs/ui-screenshots/workbench-zh.png" width="48%" alt="Chinese image editor with completed workflow, final prompt, reference image, and image result" /></a>
+  <a href="./docs/ui-screenshots/workbench-en.png"><img src="./docs/ui-screenshots/workbench-en.png" width="48%" alt="English image workbench with generation controls and a sample image result" /></a>
 </p>
-<p align="center"><sub>Image workbench · workflow status · prompt preview · image controls</sub></p>
+<p align="center"><sub>Image workbench · Chinese / English</sub></p>
 
 <p align="center">
-  <a href="./docs/ui-screenshots/settings-image-api.png"><img src="./docs/ui-screenshots/settings-image-api.png" width="48%" alt="Image API settings dialog" /></a>
-  <a href="./docs/ui-screenshots/settings-text-model.png"><img src="./docs/ui-screenshots/settings-text-model.png" width="48%" alt="Text model and prompt refinement settings dialog" /></a>
+  <a href="./docs/ui-screenshots/history-zh.png"><img src="./docs/ui-screenshots/history-zh.png" width="48%" alt="Chinese image history with a sample image, model, timing, and estimated cost" /></a>
+  <a href="./docs/ui-screenshots/history-en.png"><img src="./docs/ui-screenshots/history-en.png" width="48%" alt="English image history with a sample image, model, timing, and estimated cost" /></a>
 </p>
-<p align="center"><sub>Image API settings · Text model, effort, and prompt-refinement settings</sub></p>
+<p align="center"><sub>Image history · Chinese / English</sub></p>
 
 <p align="center">
-  <a href="./docs/ui-screenshots/text-chat.png"><img src="./docs/ui-screenshots/text-chat.png" width="64%" alt="Standalone text chat page with model and effort controls" /></a>
+  <a href="./docs/ui-screenshots/settings-zh.png"><img src="./docs/ui-screenshots/settings-zh.png" width="48%" alt="Chinese API settings with obscured Base URL and no API key displayed" /></a>
+  <a href="./docs/ui-screenshots/settings-en.png"><img src="./docs/ui-screenshots/settings-en.png" width="48%" alt="English API settings with obscured Base URL and no API key displayed" /></a>
 </p>
-<p align="center"><sub>Standalone text chat · model selector · reasoning effort · response timing</sub></p>
+<p align="center"><sub>API settings · Chinese / English</sub></p>
 
 ## Local setup
 
