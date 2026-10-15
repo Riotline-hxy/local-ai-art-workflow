@@ -1,0 +1,14 @@
+# Insert this block inside the existing {$STRATEGYOS_DOMAIN} site block,
+# before the existing @public_api/handle rules.
+@photo_workbench path /photo /photo/*
+handle @photo_workbench {
+    request_body {
+        max_size 100MB
+    }
+    reverse_proxy 127.0.0.1:8791 {
+        transport http {
+            read_timeout 900s
+            write_timeout 900s
+        }
+    }
+}

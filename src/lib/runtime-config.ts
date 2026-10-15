@@ -12,10 +12,16 @@ export type RuntimeConfig = {
     promptRefinerEnabled?: boolean;
     promptRefinerEffort?: TextEffort;
 };
-const configFile = path.join(process.cwd(), '.local-runtime-config.json');
+function configFilePath() {
+    const configuredPath = process.env.PHOTO_CONFIG_FILE;
+    if (!configuredPath) return path.join(process.cwd(), '.local-runtime-config.json');
+    if (!path.isAbsolute(configuredPath)) throw new Error('PHOTO_CONFIG_FILE must be an absolute path');
+    return configuredPath;
+}
 export async function getRuntimeConfig(): Promise<RuntimeConfig> {
+    const configFile = configFilePath();
     let local: RuntimeConfig = {};
-    try { local = JSON.parse(await fs.readFile(configFile, 'utf8')); }
+    try { local = JSON.parse(await fs.readFile(/* turbopackIgnore: true */ configFile, 'utf8')); }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw new Error('Unable to read local configuration'); }
     return {
         openaiApiKey: process.env.OPENAI_API_KEY,
@@ -29,6 +35,7 @@ export async function getRuntimeConfig(): Promise<RuntimeConfig> {
     };
 }
 export async function saveRuntimeConfig(config: RuntimeConfig) {
+    const configFile = configFilePath();
     const temporaryFile = configFile + '.' + randomUUID() + '.tmp';
     try {
         await fs.writeFile(temporaryFile, JSON.stringify(config, null, 2), { mode: 0o600 });

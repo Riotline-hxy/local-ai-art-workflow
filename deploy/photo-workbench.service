@@ -1,0 +1,30 @@
+[Unit]
+Description=Company Photo Workbench (Next.js)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=photo-workbench
+Group=photo-workbench
+WorkingDirectory=/opt/photo-workbench
+EnvironmentFile=/etc/photo-workbench.env
+ExecStart=/usr/bin/npm run start -- --hostname 127.0.0.1 --port 8791
+Restart=on-failure
+RestartSec=5s
+UMask=0077
+TimeoutStopSec=30s
+LimitNOFILE=65536
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ReadWritePaths=/srv/photo-workbench
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

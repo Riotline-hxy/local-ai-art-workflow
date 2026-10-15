@@ -13,7 +13,8 @@ const initialCwd = process.cwd();
 const environmentNames = [
     'NODE_ENV', 'OPENAI_API_KEY', 'OPENAI_API_BASE_URL', 'PROMPT_REFINER_API_KEY',
     'PROMPT_REFINER_BASE_URL', 'PROMPT_REFINER_MODEL', 'PROMPT_REFINER_ENABLED',
-    'NEXT_PUBLIC_PROMPT_REFINER_ENABLED', 'PROMPT_REFINER_EFFORT'
+    'NEXT_PUBLIC_PROMPT_REFINER_ENABLED', 'PROMPT_REFINER_EFFORT',
+    'PHOTO_ALLOW_REMOTE_CONFIG', 'PHOTO_PUBLIC_ORIGIN', 'PHOTO_CONFIG_FILE'
 ];
 const initialEnvironment = Object.fromEntries(environmentNames.map(name => [name, process.env[name]]));
 let temporaryRoot;
@@ -209,6 +210,161 @@ test('configuration persistence, redaction, and local route guards', { concurren
             const response = await route.POST(request('POST', body));
             assert.equal(response.status, 400, 'Expected an invalid configuration to fail');
             assert.equal(await fs.readFile(configPath, 'utf8'), before);
+        }
+    });
+
+    await context.test('production settings require an explicit remote flag and a valid public origin', async () => {
+        process.env.NODE_ENV = 'production';
+        process.env.PHOTO_PUBLIC_ORIGIN = 'https://strategy.noryx.cn';
+        const publicHeaders = { host: 'strategy.noryx.cn', origin: 'https://strategy.noryx.cn' };
+        try {
+            for (const flag of [undefined, '0', 'true']) {
+                if (flag === undefined) delete process.env.PHOTO_ALLOW_REMOTE_CONFIG;
+                else process.env.PHOTO_ALLOW_REMOTE_CONFIG = flag;
+                assert.equal((await route.GET(request('GET', undefined, publicHeaders))).status, 403);
+                assert.equal((await route.POST(request('POST', {}, publicHeaders))).status, 403);
+            }
+            process.env.PHOTO_ALLOW_REMOTE_CONFIG = '1';
+            for (const publicOrigin of [undefined, 'not-a-url', 'ftp://strategy.noryx.cn',
+                'https://user:secret@strategy.noryx.cn', 'https://strategy.noryx.cn/photo',
+                'https://strategy.noryx.cn?secret=1', 'https://strategy.noryx.cn#fragment']) {
+                if (publicOrigin === undefined) delete process.env.PHOTO_PUBLIC_ORIGIN;
+                else process.env.PHOTO_PUBLIC_ORIGIN = publicOrigin;
+                assert.equal((await route.GET(request('GET', undefined, publicHeaders))).status, 403);
+                assert.equal((await route.POST(request('POST', {}, publicHeaders))).status, 403);
+                assert.equal((await route.GET(request())).status, 403, 'Invalid remote setup must not fall back to localhost');
+            }
+        } finally {
+            process.env.NODE_ENV = 'development';
+            delete process.env.PHOTO_ALLOW_REMOTE_CONFIG;
+            delete process.env.PHOTO_PUBLIC_ORIGIN;
+        }
+    });
+
+    await context.test('same-origin production settings persist all fields without returning saved keys', async () => {
+        process.env.NODE_ENV = 'production';
+        process.env.PHOTO_ALLOW_REMOTE_CONFIG = '1';
+        process.env.PHOTO_PUBLIC_ORIGIN = 'https://strategy.noryx.cn';
+        const publicHeaders = { host: 'strategy.noryx.cn', origin: 'https://strategy.noryx.cn', 'sec-fetch-site': 'same-origin' };
+        try {
+            // The request URL stays localhost, like the internal side of the company reverse proxy.
+            const response = await route.POST(request('POST', {
+                openaiBaseUrl: 'https://company-image.example.test/v1/',
+                openaiApiKey: '  test-company-image-secret  ',
+                promptRefinerBaseUrl: 'https://company-text.example.test/v1/',
+                promptRefinerApiKey: 'test-company-text-secret',
+                promptRefinerModel: 'company-chat', promptRefinerEffort: 'xhigh',
+                promptRefinerEnabled: true
+            }, publicHeaders));
+            assert.equal(response.status, 200);
+            assert.equal(response.headers.get('cache-control'), 'no-store');
+            const readResponse = await route.GET(request('GET', undefined, { host: 'strategy.noryx.cn' }));
+            assert.equal(readResponse.status, 200, 'GET may omit Origin');
+            const publicSettings = await readResponse.json();
+            assert.equal(publicSettings.openaiBaseUrl, 'https://company-image.example.test/v1');
+            assert.equal(publicSettings.promptRefinerBaseUrl, 'https://company-text.example.test/v1');
+            assert.equal(publicSettings.promptRefinerModel, 'company-chat');
+            assert.equal(publicSettings.promptRefinerEffort, 'xhigh');
+            assert.equal(publicSettings.promptRefinerEnabled, true);
+            assert.equal(publicSettings.canEditCredentials, true);
+            assert.equal(publicSettings.canEditPreferences, true);
+            assert.equal(publicSettings.imageKeyConfigured, true);
+            assert.equal(publicSettings.textKeyConfigured, true);
+            assert.equal('openaiApiKey' in publicSettings, false);
+            assert.equal('promptRefinerApiKey' in publicSettings, false);
+            assert.equal(JSON.stringify(publicSettings).includes('secret'), false);
+            const blankSave = await route.POST(request('POST', {
+                openaiApiKey: '', promptRefinerApiKey: '  ',
+                promptRefinerModel: 'company-chat-updated', promptRefinerEffort: 'default',
+                promptRefinerEnabled: false
+            }, publicHeaders));
+            assert.equal(blankSave.status, 200);
+            const saved = await runtime.getRuntimeConfig();
+            assert.equal(saved.openaiApiKey, 'test-company-image-secret');
+            assert.equal(saved.promptRefinerApiKey, 'test-company-text-secret');
+            assert.equal(saved.promptRefinerModel, 'company-chat-updated');
+            assert.equal(saved.promptRefinerEffort, 'default');
+            assert.equal(saved.promptRefinerEnabled, false);
+            for (const invalid of [{ promptRefinerEffort: 'unsupported' }, { promptRefinerEnabled: 'true' }]) {
+                assert.equal((await route.POST(request('POST', invalid, publicHeaders))).status, 400);
+                assert.deepEqual(await runtime.getRuntimeConfig(), saved);
+            }
+        } finally {
+            process.env.NODE_ENV = 'development';
+            delete process.env.PHOTO_ALLOW_REMOTE_CONFIG;
+            delete process.env.PHOTO_PUBLIC_ORIGIN;
+        }
+    });
+
+    await context.test('remote settings reject wrong hosts, missing POST origins, and cross-origin requests', async () => {
+        process.env.NODE_ENV = 'production';
+        process.env.PHOTO_ALLOW_REMOTE_CONFIG = '1';
+        process.env.PHOTO_PUBLIC_ORIGIN = 'https://strategy.noryx.cn';
+        const configPath = path.join(temporaryRoot, '.local-runtime-config.json');
+        const before = await fs.readFile(configPath, 'utf8');
+        const publicHeaders = { host: 'strategy.noryx.cn', origin: 'https://strategy.noryx.cn' };
+        try {
+            for (const [method, overrides] of [
+                ['GET', { host: 'localhost:3000' }],
+                ['GET', { host: 'strategy.noryx.cn.evil.example.test' }],
+                ['GET', { host: 'evil.example.test', 'x-forwarded-host': 'strategy.noryx.cn' }],
+                ['GET', { origin: 'https://evil.example.test' }],
+                ['GET', { origin: 'https://chat.noryx.cn' }],
+                ['GET', { origin: '' }],
+                ['GET', { 'sec-fetch-site': 'cross-site' }],
+                ['GET', { 'sec-fetch-site': 'same-site', origin: null }],
+                ['POST', { origin: null }],
+                ['POST', { origin: 'null' }],
+                ['POST', { origin: 'http://strategy.noryx.cn' }],
+                ['POST', { origin: 'https://evil.example.test' }],
+                ['POST', { host: '127.0.0.1:8791' }],
+                ['POST', { 'sec-fetch-site': 'cross-site' }],
+                ['POST', { 'content-type': 'text/plain' }]
+            ]) {
+                const response = await route[method](request(method,
+                    { openaiApiKey: 'test-forbidden-remote-replacement' }, { ...publicHeaders, ...overrides }));
+                assert.equal(response.status, 403, JSON.stringify({ method, overrides }));
+            }
+            assert.equal(await fs.readFile(configPath, 'utf8'), before);
+        } finally {
+            process.env.NODE_ENV = 'development';
+            delete process.env.PHOTO_ALLOW_REMOTE_CONFIG;
+            delete process.env.PHOTO_PUBLIC_ORIGIN;
+        }
+    });
+
+    await context.test('absolute external configuration persists across reloads and reads disk changes immediately', async () => {
+        const defaultPath = path.join(temporaryRoot, '.local-runtime-config.json');
+        const defaultContents = await fs.readFile(defaultPath, 'utf8');
+        const persistentDir = path.join(temporaryRoot, 'persistent');
+        const externalPath = path.join(persistentDir, 'runtime-config.json');
+        await fs.mkdir(persistentDir);
+        process.env.PHOTO_CONFIG_FILE = externalPath;
+        try {
+            const response = await route.POST(request('POST', {
+                openaiApiKey: 'test-external-image-secret',
+                promptRefinerModel: 'external-chat', promptRefinerEnabled: true
+            }));
+            assert.equal(response.status, 200);
+            const stored = JSON.parse(await fs.readFile(externalPath, 'utf8'));
+            assert.equal(stored.openaiApiKey, 'test-external-image-secret');
+            assert.equal(stored.promptRefinerModel, 'external-chat');
+            assert.equal(await fs.readFile(defaultPath, 'utf8'), defaultContents);
+            process.chdir(persistentDir);
+            const reloaded = await import(pathToFileURL(path.join(temporaryRoot, 'runtime-config.mjs')).href + '?external-reload');
+            assert.equal((await reloaded.getRuntimeConfig()).openaiApiKey, 'test-external-image-secret');
+            await fs.writeFile(externalPath, JSON.stringify({ ...stored, promptRefinerModel: 'edited-on-disk' }));
+            assert.equal((await runtime.getRuntimeConfig()).promptRefinerModel, 'edited-on-disk');
+            await reloaded.saveRuntimeConfig({ ...stored, promptRefinerModel: 'saved-after-reload' });
+            assert.equal(JSON.parse(await fs.readFile(externalPath, 'utf8')).promptRefinerModel, 'saved-after-reload');
+            assert.deepEqual((await fs.readdir(persistentDir)).filter(name => name.endsWith('.tmp')), []);
+            assert.equal(await fs.readFile(defaultPath, 'utf8'), defaultContents);
+            process.env.PHOTO_CONFIG_FILE = 'relative-config.json';
+            await assert.rejects(runtime.getRuntimeConfig(), /must be an absolute path/);
+            await assert.rejects(runtime.saveRuntimeConfig({}), /must be an absolute path/);
+        } finally {
+            process.chdir(temporaryRoot);
+            delete process.env.PHOTO_CONFIG_FILE;
         }
     });
 
